@@ -1,0 +1,6 @@
+{
+  "name": "GovGuide AI",
+  "description": "AI-powered citizen assistance application helping users navigate Indian government services like Passport, Aadhaar, PAN Card, Driving Licence, and Voter ID.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
