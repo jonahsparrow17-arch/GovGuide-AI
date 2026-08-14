@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { sendChatMessage } from '../services/api';
-import { ChatResponse, GovernmentService } from '../types';
-import { Bot, User, Send, Sparkles, ExternalLink, RefreshCw, Copy, Check, ShieldAlert, BookOpen } from 'lucide-react';
+import { sendChatMessage, fetchSchemes } from '../services/api';
+import { ChatResponse, GovernmentService, GovernmentScheme } from '../types';
+import { Bot, User, Send, Sparkles, ExternalLink, RefreshCw, Copy, Check, ShieldAlert, BookOpen, Landmark, FileCheck } from 'lucide-react';
 
 interface AIChatPageProps {
   initialServiceSlug?: string;
@@ -26,15 +26,17 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
   availableServices = [],
   onSelectService
 }) => {
+  const [schemes, setSchemes] = useState<GovernmentScheme[]>([]);
   const [messages, setMessages] = useState<MessageItem[]>([
     {
       id: 'welcome',
       sender: 'ai',
-      text: 'Hello! I am your **GovGuide AI Assistant**.\n\nAsk me any question about government service procedures, required documents, eligibility, or application steps for **Passport**, **Aadhaar**, **PAN Card**, **Driving Licence**, or **Voter ID**.',
+      text: 'Hello! I am your **GovGuide AI Citizen Assistant**.\n\nAsk me any question about government service procedures, eligibility, and required documents for **Passport**, **Aadhaar**, **PAN Card**, **Driving Licence**, **Voter ID**, or **Government Welfare Schemes** (such as *Pudhumai Penn*, *Tamil Pudhalvan*, *Magalir Urimai Thittam*, *Vidiyal Payanam*, *PM-Kisan*, *Ayushman Bharat*, etc.).',
       suggestedQuestions: [
         'What documents do I need for a fresh passport?',
-        'How do I apply for a free Instant e-PAN card?',
-        'What is the procedure for a driving licence test?',
+        'Who is eligible for Pudhumai Penn ₹1,000 scheme?',
+        'How do I apply for an Instant e-PAN card?',
+        'What are the requirements for Tamil Pudhalvan scheme?',
         'How to update address in Aadhaar card?'
       ],
       timestamp: new Date()
@@ -47,6 +49,18 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    async function loadSchemes() {
+      try {
+        const schms = await fetchSchemes();
+        setSchemes(schms);
+      } catch (e) {
+        console.error('Failed to load schemes for chat filter', e);
+      }
+    }
+    loadSchemes();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -103,7 +117,7 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
         {
           id: 'err-' + Date.now(),
           sender: 'ai',
-          text: 'I encountered an error reaching the guidance engine. Please check your connection or select a service from the menu.',
+          text: 'I encountered an error reaching the guidance engine. Please check your connection or try asking your question again.',
           source: 'https://india.gov.in',
           timestamp: new Date()
         }
@@ -120,12 +134,8 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
   };
 
   const renderFormattedText = (text: string) => {
-    // Simple markdown renderer for bold, lists, and headers
     const lines = text.split('\n');
     return lines.map((line, idx) => {
-      let content = line;
-
-      // Header h3 or h4
       if (line.startsWith('### ')) {
         return (
           <h3 key={idx} className="font-bold text-slate-900 text-base mt-3 mb-1">
@@ -141,7 +151,6 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
         );
       }
 
-      // Bullet lists
       if (line.startsWith('- ') || line.startsWith('* ')) {
         const listText = line.replace(/^[-*]\s+/, '');
         return (
@@ -151,9 +160,7 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
         );
       }
 
-      // Numbered lists
       if (/^\d+\.\s/.test(line)) {
-        const numText = line.replace(/^\d+\.\s/, '');
         return (
           <p key={idx} className="ml-2 text-slate-800 text-xs sm:text-sm my-1 leading-relaxed font-medium">
             <span dangerouslySetInnerHTML={{ __html: formatInlineMarkdown(line) }} />
@@ -174,47 +181,53 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
   };
 
   const formatInlineMarkdown = (str: string) => {
-    // Convert **bold** and [link](url)
     let formatted = str
-      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-900">$1</strong>')
-      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener" class="text-indigo-600 underline font-medium">$1</a>');
+      .replace(/\*\*(.*?)\*\*/g, '<strong class="font-semibold text-slate-950">$1</strong>')
+      .replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer" class="text-blue-700 underline font-medium">$1</a>');
     return formatted;
   };
 
   return (
     <div className="max-w-4xl mx-auto px-4 sm:px-6 py-6">
       {/* Top Banner */}
-      <div className="bg-slate-900 text-white rounded-2xl p-6 mb-6 shadow-md relative overflow-hidden">
+      <div className="bg-[#0B1F3A] text-white rounded-3xl p-6 mb-6 shadow-md relative overflow-hidden">
         <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2 mb-1">
-              <Sparkles className="w-5 h-5 text-indigo-400" />
-              <h1 className="text-xl font-bold">GovGuide AI Citizen Assistant</h1>
+              <Sparkles className="w-5 h-5 text-amber-400" />
+              <h1 className="text-xl font-extrabold tracking-tight">GovGuide AI Citizen Assistant</h1>
             </div>
             <p className="text-xs text-slate-300">
-              Ask questions about eligibility, documents, step-by-step procedures, or common errors.
+              Ask questions about eligibility criteria, document checklists, procedures, or common errors.
             </p>
           </div>
 
-          {/* Service Filter Selector */}
+          {/* Context Selector */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-300 whitespace-nowrap">Context:</span>
+            <span className="text-xs text-slate-300 whitespace-nowrap">Focus:</span>
             <select
               value={selectedServiceSlug}
               onChange={(e) => setSelectedServiceSlug(e.target.value)}
-              className="bg-slate-800 text-white text-xs border border-slate-700 rounded-xl px-3 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500"
+              className="bg-slate-800 text-white text-xs border border-slate-700 rounded-xl px-3 py-2 font-medium focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
-              <option value="">All Services (General)</option>
-              {availableServices.map(s => (
-                <option key={s.slug} value={s.slug}>{s.name}</option>
-              ))}
+              <option value="">All Services & Schemes</option>
+              <optgroup label="5 Core Services">
+                {availableServices.map(s => (
+                  <option key={s.slug} value={s.slug}>{s.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Government Schemes">
+                {schemes.map(schm => (
+                  <option key={schm.slug} value={schm.slug}>{schm.name}</option>
+                ))}
+              </optgroup>
             </select>
           </div>
         </div>
       </div>
 
       {/* Messages Container */}
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[580px]">
+      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden flex flex-col h-[600px]">
         {/* Chat scroll area */}
         <div className="flex-1 p-4 sm:p-6 overflow-y-auto space-y-6">
           {messages.map((msg) => (
@@ -226,28 +239,28 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
               <div
                 className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 font-bold text-xs shadow-sm ${
                   msg.sender === 'user'
-                    ? 'bg-slate-900 text-white'
-                    : 'bg-indigo-600 text-white'
+                    ? 'bg-[#0B1F3A] text-white'
+                    : 'bg-[#1A4D8F] text-white'
                 }`}
               >
-                {msg.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4" />}
+                {msg.sender === 'user' ? <User className="w-4 h-4" /> : <Bot className="w-4 h-4 text-amber-300" />}
               </div>
 
               {/* Bubble */}
               <div
-                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-sm ${
+                className={`max-w-[85%] sm:max-w-[75%] rounded-2xl p-4 shadow-xs ${
                   msg.sender === 'user'
-                    ? 'bg-indigo-600 text-white'
+                    ? 'bg-[#1A4D8F] text-white'
                     : 'bg-slate-50 border border-slate-200/80 text-slate-900'
                 }`}
               >
                 {/* Header info for AI messages */}
                 {msg.sender === 'ai' && msg.service && (
                   <div className="flex items-center gap-1.5 mb-2 pb-2 border-b border-slate-200/60">
-                    <span className="bg-indigo-100 text-indigo-700 text-[10px] font-bold px-2 py-0.5 rounded-full">
+                    <span className="bg-blue-100 text-blue-900 text-[10px] font-bold px-2 py-0.5 rounded-full">
                       {msg.service}
                     </span>
-                    <span className="text-[10px] text-slate-500">Database Context Applied</span>
+                    <span className="text-[10px] text-slate-500 font-medium">Verified Context Applied</span>
                   </div>
                 )}
 
@@ -264,7 +277,7 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
                         href={msg.source}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800"
+                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 hover:text-blue-950"
                       >
                         <ExternalLink className="w-3 h-3" />
                         <span>Official Source Portal</span>
@@ -285,14 +298,14 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
                 {msg.sender === 'ai' && msg.suggestedQuestions && msg.suggestedQuestions.length > 0 && (
                   <div className="mt-4 pt-3 border-t border-slate-200/60">
                     <span className="text-[10px] uppercase font-bold text-slate-400 block mb-2">
-                      Suggested Next Questions:
+                      Suggested Questions:
                     </span>
                     <div className="flex flex-wrap gap-1.5">
                       {msg.suggestedQuestions.map((q, idx) => (
                         <button
                           key={idx}
                           onClick={() => handleSend(q)}
-                          className="text-[11px] bg-white border border-slate-200 text-slate-700 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-700 px-2.5 py-1 rounded-lg transition-colors text-left"
+                          className="text-[11px] bg-white border border-slate-200 text-slate-700 hover:bg-blue-50 hover:border-blue-200 hover:text-blue-900 px-2.5 py-1 rounded-lg transition-colors text-left font-medium"
                         >
                           {q}
                         </button>
@@ -307,12 +320,12 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
           {/* Typing indicator */}
           {isLoading && (
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center font-bold text-xs">
-                <Bot className="w-4 h-4 animate-pulse" />
+              <div className="w-9 h-9 rounded-xl bg-[#1A4D8F] text-white flex items-center justify-center font-bold text-xs">
+                <Bot className="w-4 h-4 animate-pulse text-amber-300" />
               </div>
               <div className="bg-slate-100 p-3 rounded-2xl border border-slate-200 text-xs text-slate-600 flex items-center gap-2">
-                <RefreshCw className="w-3.5 h-3.5 animate-spin text-indigo-600" />
-                <span>Consulting verified government service procedures...</span>
+                <RefreshCw className="w-3.5 h-3.5 animate-spin text-blue-700" />
+                <span>Consulting verified procedures and eligibility rules...</span>
               </div>
             </div>
           )}
@@ -333,14 +346,14 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
               type="text"
               value={inputMessage}
               onChange={(e) => setInputMessage(e.target.value)}
-              placeholder="Ask a question (e.g. What documents are needed for passport renewal?)"
-              className="flex-1 bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500 shadow-sm"
+              placeholder="Ask a question (e.g. Can college girls get ₹1000 under Pudhumai Penn? What is Tatkaal fee?)"
+              className="flex-1 bg-white border border-slate-300 rounded-xl px-4 py-2.5 text-xs sm:text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-900 shadow-xs"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading || !inputMessage.trim()}
-              className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold text-xs sm:text-sm px-5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
+              className="bg-[#0B1F3A] hover:bg-[#1A4D8F] disabled:opacity-50 text-white font-bold text-xs sm:text-sm px-5 py-2.5 rounded-xl flex items-center gap-1.5 shadow-sm transition-colors"
             >
               <span>Send</span>
               <Send className="w-3.5 h-3.5" />
@@ -348,8 +361,8 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
           </form>
 
           <p className="text-[10px] text-slate-400 text-center mt-2 flex items-center justify-center gap-1">
-            <ShieldAlert className="w-3 h-3 text-indigo-400" />
-            <span>GovGuide AI provides educational information. Verify official details on government portals.</span>
+            <ShieldAlert className="w-3 h-3 text-amber-500" />
+            <span>GovGuide AI provides educational guidance. Verify official details on designated government portals.</span>
           </p>
         </div>
       </div>

@@ -1,36 +1,40 @@
 import React from 'react';
-import { ShieldAlert, ExternalLink, CheckCircle2, Compass } from 'lucide-react';
+import { ShieldAlert, ExternalLink, CheckCircle2, Compass, Landmark, CheckSquare, Sparkles } from 'lucide-react';
+import { NavTab } from './Header';
 
 interface FooterProps {
   onSelectService?: (slug: string) => void;
-  setActiveTab?: (tab: 'home' | 'services' | 'chat') => void;
+  onSelectScheme?: (slug: string) => void;
+  setActiveTab?: (tab: NavTab) => void;
 }
 
-export const Footer: React.FC<FooterProps> = ({ onSelectService, setActiveTab }) => {
+export const Footer: React.FC<FooterProps> = ({ onSelectService, onSelectScheme, setActiveTab }) => {
   return (
-    <footer className="bg-slate-900 text-slate-300 border-t border-slate-800 mt-20">
+    <footer className="bg-[#0B1F3A] text-slate-300 border-t border-slate-800 mt-20">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-8 mb-10">
           {/* Brand Col */}
-          <div className="md:col-span-1">
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-8 h-8 rounded-lg bg-indigo-600 text-white flex items-center justify-center font-bold">
-                <Compass className="w-4 h-4" />
+          <div className="md:col-span-1 space-y-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-blue-600 text-white flex items-center justify-center font-bold">
+                <Compass className="w-4 h-4 text-amber-400" />
               </div>
-              <span className="font-bold text-lg text-white">GovGuide AI</span>
+              <span className="font-bold text-lg text-white font-sans">GovGuide AI</span>
             </div>
-            <p className="text-xs text-slate-400 leading-relaxed mb-4">
-              AI-assisted educational portal providing simplified procedures, document checklists, and guidance for citizen services in India.
+            <p className="text-xs text-slate-400 leading-relaxed">
+              An independent civic-tech educational platform. We translate complex government procedures and public welfare schemes into plain, simple language.
             </p>
-            <div className="flex items-center gap-1.5 text-[11px] text-emerald-400 font-medium bg-slate-800/80 px-2.5 py-1 rounded-md w-fit border border-slate-700">
+            <div className="inline-flex items-center gap-1.5 text-[11px] text-emerald-400 font-semibold bg-slate-800/80 px-2.5 py-1 rounded-md border border-slate-700">
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>Version 1.0 — 5 Core Services Supported</span>
+              <span>Understand. Prepare. Navigate.</span>
             </div>
           </div>
 
-          {/* Supported Services */}
+          {/* Supported Core Services */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">Supported Services</h4>
+            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">
+              5 Core Services
+            </h4>
             <ul className="space-y-2 text-xs text-slate-400">
               <li>
                 <button
@@ -75,96 +79,91 @@ export const Footer: React.FC<FooterProps> = ({ onSelectService, setActiveTab })
             </ul>
           </div>
 
-          {/* Official Portals */}
+          {/* Featured Welfare Schemes */}
           <div>
-            <h4 className="text-sm font-semibold text-white uppercase tracking-wider mb-3">Official Government Portals</h4>
+            <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-3">
+              Popular Schemes
+            </h4>
             <ul className="space-y-2 text-xs text-slate-400">
               <li>
-                <a
-                  href="https://passportindia.gov.in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-400 inline-flex items-center gap-1 transition-colors"
+                <button
+                  onClick={() => onSelectScheme?.('pudhumai-penn')}
+                  className="hover:text-white hover:underline transition-colors text-left"
                 >
-                  Passport Seva Portal <ExternalLink className="w-3 h-3" />
-                </a>
+                  Pudhumai Penn (₹1,000/mo)
+                </button>
               </li>
               <li>
-                <a
-                  href="https://uidai.gov.in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-400 inline-flex items-center gap-1 transition-colors"
+                <button
+                  onClick={() => onSelectScheme?.('tamil-pudhalvan')}
+                  className="hover:text-white hover:underline transition-colors text-left"
                 >
-                  UIDAI (Aadhaar Official) <ExternalLink className="w-3 h-3" />
-                </a>
+                  Tamil Pudhalvan (₹1,000/mo)
+                </button>
               </li>
               <li>
-                <a
-                  href="https://www.incometax.gov.in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-400 inline-flex items-center gap-1 transition-colors"
+                <button
+                  onClick={() => onSelectScheme?.('vidiyal-payanam-women-bus-travel')}
+                  className="hover:text-white hover:underline transition-colors text-left"
                 >
-                  Income Tax e-Filing (PAN) <ExternalLink className="w-3 h-3" />
-                </a>
+                  Vidiyal Payanam (Free Bus Travel)
+                </button>
               </li>
               <li>
-                <a
-                  href="https://parivahan.gov.in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-400 inline-flex items-center gap-1 transition-colors"
+                <button
+                  onClick={() => onSelectScheme?.('kalaignar-magalir-urimai-thittam')}
+                  className="hover:text-white hover:underline transition-colors text-left"
                 >
-                  Parivahan Sewa (Driving Licence) <ExternalLink className="w-3 h-3" />
-                </a>
+                  Magalir Urimai Thittam (₹1,000/mo)
+                </button>
               </li>
               <li>
-                <a
-                  href="https://voters.eci.gov.in"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="hover:text-indigo-400 inline-flex items-center gap-1 transition-colors"
+                <button
+                  onClick={() => onSelectScheme?.('naan-mudhalvan')}
+                  className="hover:text-white hover:underline transition-colors text-left"
                 >
-                  Election Commission Voters Portal <ExternalLink className="w-3 h-3" />
-                </a>
+                  Naan Mudhalvan Skill Scheme
+                </button>
               </li>
             </ul>
           </div>
 
-          {/* Disclaimer Box */}
-          <div className="bg-slate-800/60 p-4 rounded-xl border border-slate-700/60">
-            <div className="flex items-center gap-2 text-amber-400 text-xs font-semibold mb-2">
-              <ShieldAlert className="w-4 h-4 shrink-0" />
-              <span>Important Disclaimer</span>
+          {/* Official Portals & Disclaimer */}
+          <div className="space-y-4">
+            <div>
+              <h4 className="text-xs font-bold text-amber-400 uppercase tracking-wider mb-2">
+                Official Sources
+              </h4>
+              <div className="flex flex-wrap gap-2 text-[11px] text-slate-400">
+                <a href="https://passportindia.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">passportindia.gov.in</a> •
+                <a href="https://uidai.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">uidai.gov.in</a> •
+                <a href="https://incometax.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">incometax.gov.in</a> •
+                <a href="https://parivahan.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">parivahan.gov.in</a> •
+                <a href="https://voters.eci.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">voters.eci.gov.in</a>
+              </div>
             </div>
-            <p className="text-[11px] text-slate-400 leading-relaxed">
-              GovGuide AI is an independent educational tool. It does not store user documents, collect official identity details, or claim authority over government procedures. Always verify fees and policies on official <code className="text-indigo-300">.gov.in</code> websites before submitting applications.
-            </p>
+
+            <div className="bg-slate-800/80 p-3.5 rounded-xl border border-slate-700 text-[11px] text-slate-400 leading-relaxed">
+              <div className="flex items-center gap-1.5 text-amber-400 font-bold mb-1">
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
+                <span>Civic Technology Notice</span>
+              </div>
+              GovGuide AI is an independent educational tool and not an official government service. It does not collect official user documents or submit applications.
+            </div>
           </div>
         </div>
 
+        {/* Bottom bar */}
         <div className="pt-6 border-t border-slate-800 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-4">
-          <p>© {new Date().getFullYear()} GovGuide AI. Designed as an open educational civic tech initiative.</p>
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setActiveTab?.('home')}
-              className="hover:text-slate-300 transition-colors"
-            >
-              Home
-            </button>
-            <button
-              onClick={() => setActiveTab?.('services')}
-              className="hover:text-slate-300 transition-colors"
-            >
-              All Services
-            </button>
-            <button
-              onClick={() => setActiveTab?.('chat')}
-              className="hover:text-slate-300 transition-colors"
-            >
-              Ask AI Assistant
-            </button>
+          <p>© {new Date().getFullYear()} GovGuide AI. Designed as an independent civic-tech public interest resource.</p>
+          <div className="flex items-center gap-4 flex-wrap">
+            <button onClick={() => setActiveTab?.('home')} className="hover:text-slate-300 transition-colors">Home</button>
+            <button onClick={() => setActiveTab?.('services')} className="hover:text-slate-300 transition-colors">5 Core Services</button>
+            <button onClick={() => setActiveTab?.('schemes')} className="hover:text-slate-300 transition-colors">Government Schemes</button>
+            <button onClick={() => setActiveTab?.('wizard')} className="hover:text-slate-300 transition-colors">Find for Me</button>
+            <button onClick={() => setActiveTab?.('checklist')} className="hover:text-slate-300 transition-colors">Checklist</button>
+            <button onClick={() => setActiveTab?.('trust')} className="hover:text-slate-300 transition-colors">Trust System</button>
+            <button onClick={() => setActiveTab?.('chat')} className="hover:text-slate-300 transition-colors">Ask AI</button>
           </div>
         </div>
       </div>
