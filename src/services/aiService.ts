@@ -1,6 +1,6 @@
 import { GoogleGenAI } from '@google/genai';
-import { getAllServices, getServiceBySlug } from '../db/database.js';
-import { ChatResponse, GovernmentService } from '../types.js';
+import { getAllServices, getServiceBySlug, getAllSchemes, getSchemeBySlug } from '../db/database.js';
+import { ChatResponse, GovernmentService, GovernmentScheme } from '../types.js';
 
 let aiInstance: GoogleGenAI | null = null;
 
@@ -22,15 +22,42 @@ function getAiClient(): GoogleGenAI {
 export async function processChatQuery(message: string, requestedServiceSlug?: string): Promise<ChatResponse> {
   const queryLower = message.toLowerCase();
   const allServices = await getAllServices();
+  const allSchemes = await getAllSchemes();
 
-  // Determine relevant service context
+  // Determine relevant service or scheme context
   let matchedService: GovernmentService | null = null;
+  let matchedScheme: GovernmentScheme | null = null;
 
   if (requestedServiceSlug) {
     matchedService = await getServiceBySlug(requestedServiceSlug);
+    if (!matchedService) {
+      matchedScheme = await getSchemeBySlug(requestedServiceSlug);
+    }
   }
 
-  if (!matchedService) {
+  // Check matching scheme first
+  if (!matchedService && !matchedScheme) {
+    if (queryLower.includes('pudhumai') || queryLower.includes('penn') || queryLower.includes('moovalur')) {
+      matchedScheme = await getSchemeBySlug('pudhumai-penn');
+    } else if (queryLower.includes('tamil pudhalvan') || queryLower.includes('pudhalvan')) {
+      matchedScheme = await getSchemeBySlug('tamil-pudhalvan');
+    } else if (queryLower.includes('magalir') || queryLower.includes('urimai') || queryLower.includes('kmut') || queryLower.includes('kalaignar magalir')) {
+      matchedScheme = await getSchemeBySlug('kalaignar-magalir-urimai-thittam');
+    } else if (queryLower.includes('vidiyal') || queryLower.includes('free bus') || queryLower.includes('women bus')) {
+      matchedScheme = await getSchemeBySlug('vidiyal-payanam-women-bus-travel');
+    } else if (queryLower.includes('naan mudhalvan') || queryLower.includes('mudhalvan') || queryLower.includes('skill')) {
+      matchedScheme = await getSchemeBySlug('naan-mudhalvan');
+    } else if (queryLower.includes('breakfast') || queryLower.includes('kamarajar')) {
+      matchedScheme = await getSchemeBySlug('chief-ministers-breakfast-scheme');
+    } else if (queryLower.includes('pm kisan') || queryLower.includes('pm-kisan') || queryLower.includes('farmer')) {
+      matchedScheme = await getSchemeBySlug('pm-kisan-income-support');
+    } else if (queryLower.includes('old age') || queryLower.includes('oap') || queryLower.includes('pension')) {
+      matchedScheme = await getSchemeBySlug('old-age-pension-scheme');
+    }
+  }
+
+  // Then check matching core service
+  if (!matchedService && !matchedScheme) {
     if (queryLower.includes('passport')) {
       matchedService = await getServiceBySlug('passport');
     } else if (queryLower.includes('aadhaar') || queryLower.includes('aadhar') || queryLower.includes('uidai')) {
@@ -45,7 +72,36 @@ export async function processChatQuery(message: string, requestedServiceSlug?: s
   }
 
   let dbContextText = '';
-  if (matchedService) {
+  if (matchedScheme) {
+    dbContextText = `
+[RELEVANT GOVERNMENT SCHEME CONTEXT FROM VERIFIED DATABASE]:
+Scheme Name: ${matchedScheme.name}
+Category: ${matchedScheme.category}
+Department: ${matchedScheme.department}
+Authority / Jurisdiction: ${matchedScheme.state_or_central}
+Trust Status: ${matchedScheme.status} (Verified Date: ${matchedScheme.last_verified})
+Official Source: ${matchedScheme.official_source}
+Financial / Social Benefit: ${matchedScheme.benefit}
+
+Who Can Apply:
+${matchedScheme.who_can_apply}
+
+Detailed Entitlement:
+${matchedScheme.what_you_get}
+
+Eligibility Criteria:
+${matchedScheme.eligibility.map(e => '- ' + e).join('\n')}
+
+Required Documents:
+${matchedScheme.documents.map(d => '- ' + d).join('\n')}
+
+Application Procedure Steps:
+${matchedScheme.application_steps.map(s => `${s.step_number}. ${s.title} (${s.location_type}): ${s.description}`).join('\n')}
+
+Important Operational Notes:
+${matchedScheme.important_notes || 'Verify latest guidelines on official portal.'}
+`;
+  } else if (matchedService) {
     dbContextText = `
 [RELEVANT GOVERNMENT SERVICE CONTEXT FROM VERIFIED DATABASE]:
 Service Name: ${matchedService.name}
@@ -77,19 +133,22 @@ ${(matchedService.faqs || []).map(f => `Q: ${f.question}\nA: ${f.answer}`).join(
     dbContextText = `
 [AVAILABLE GOVERNMENT SERVICES IN SYSTEM]:
 ${allServices.map(s => `- ${s.name} (${s.slug}): ${s.short_description}. Website: ${s.official_website}`).join('\n')}
+
+[AVAILABLE VERIFIED GOVERNMENT SCHEMES]:
+${allSchemes.map(s => `- ${s.name} (${s.slug}): ${s.benefit}. Target: ${s.who_can_apply}. Source: ${s.official_source}`).join('\n')}
 `;
   }
 
   const systemInstruction = `
-You are GovGuide AI, an empathetic, educational citizen guidance assistant for Indian government service procedures.
-Your job is to explain government service procedures (Passport, Aadhaar, PAN Card, Driving Licence, Voter ID) in simple, clean, accessible language.
+You are GovGuide AI, an empathetic, educational citizen guidance assistant for Indian government service procedures and welfare schemes.
+Your job is to explain government service procedures (Passport, Aadhaar, PAN Card, Driving Licence, Voter ID) and key welfare schemes (such as Kalaignar Magalir Urimai Thittam, Pudhumai Penn, Tamil Pudhalvan, Vidiyal Payanam, Naan Mudhalvan, PM-KISAN, etc.) in simple, clean, accessible language.
 
-CRITICAL COMPLIANCE RULES:
+CRITICAL COMPLIANCE & ACCURACY RULES:
 1. Act purely as an educational guidance tool. NEVER claim to be an official government portal, official employee, or legal authority.
 2. NEVER claim to submit applications or issue official certificates on behalf of the user.
-3. Base your answers strictly on factual database information provided in the context when available. Do not invent fees, timelines, or requirements.
-4. Keep answers concise, nicely structured with bullet points or numbered steps, bold headings, and clean markdown formatting.
-5. If the user asks about a service outside the 5 supported services (Passport, Aadhaar, PAN, Driving Licence, Voter ID), gently inform them that GovGuide AI Version 1 supports these 5 primary services and answer with general guidance if appropriate while directing them to official portals.
+3. Base your answers strictly on factual database information provided in the context when available. Do not invent fees, eligibility rules, or timelines.
+4. When stating eligibility, use responsible language: "You may be eligible based on the current criteria. Please verify with official portal..."
+5. Keep answers concise, nicely structured with bullet points or numbered steps, bold headings, and clean markdown formatting.
 6. Always include a brief reminder at the end directing users to verify details on the official government portal.
 `;
 
@@ -98,7 +157,7 @@ User Question: "${message}"
 
 ${dbContextText}
 
-Please provide a helpful, easy-to-understand response using the information above.
+Please provide a helpful, easy-to-understand response using the verified information above.
 `;
 
   try {
@@ -114,43 +173,64 @@ Please provide a helpful, easy-to-understand response using the information abov
 
     const text = response.text || "I'm sorry, I couldn't generate a response at this moment. Please try asking again or check the official government portal.";
 
-    const defaultSuggested = matchedService ? [
-      `What are the common mistakes for ${matchedService.name}?`,
-      `How much does ${matchedService.name} cost?`,
-      `What is the official website for ${matchedService.name}?`
-    ] : [
-      "What documents do I need for a fresh passport?",
-      "How to get a free Instant e-PAN card?",
-      "What is the procedure for a driving licence test?"
-    ];
+    let defaultSuggested: string[] = [];
+    if (matchedScheme) {
+      defaultSuggested = [
+        `What documents are required for ${matchedScheme.name}?`,
+        `Who is eligible for ${matchedScheme.name}?`,
+        `What is the official website for ${matchedScheme.name}?`
+      ];
+    } else if (matchedService) {
+      defaultSuggested = [
+        `What are the common mistakes for ${matchedService.name}?`,
+        `How much does ${matchedService.name} cost?`,
+        `What is the official website for ${matchedService.name}?`
+      ];
+    } else {
+      defaultSuggested = [
+        "What documents do I need for a fresh passport?",
+        "Who is eligible for Pudhumai Penn ₹1,000 scheme?",
+        "How to apply for Kalaignar Magalir Urimai Thittam?",
+        "What are the guidelines for Tamil Pudhalvan scheme?"
+      ];
+    }
+
+    const title = matchedScheme ? matchedScheme.name : (matchedService ? matchedService.name : undefined);
+    const source = matchedScheme ? matchedScheme.official_source : (matchedService ? matchedService.official_website : 'https://india.gov.in');
 
     return {
       answer: text,
-      service: matchedService ? matchedService.name : undefined,
-      source: matchedService ? matchedService.official_website : 'https://india.gov.in',
+      service: title,
+      source: source,
       suggestedQuestions: defaultSuggested,
-      groundingContext: matchedService ? [`Verified database entry: ${matchedService.name}`] : undefined
+      groundingContext: title ? [`Verified database entry: ${title}`] : undefined
     };
   } catch (error: any) {
     console.error('Gemini API Error:', error);
 
     // Safe fallback if Gemini API call fails or key is missing
     let fallbackText = '';
-    if (matchedService) {
+    if (matchedScheme) {
+      fallbackText = `### ${matchedScheme.name} Guidance\n\n**Benefit:** ${matchedScheme.benefit}\n**Official Portal:** [${matchedScheme.official_source}](${matchedScheme.official_source})\n**Department:** ${matchedScheme.department}\n\n**Eligibility Highlights:**\n${matchedScheme.eligibility.map(e => `- ${e}`).join('\n')}\n\n**Key Documents Needed:**\n${matchedScheme.documents.map(d => `- ${d}`).join('\n')}\n\n*Note: AI assistance is currently operating in offline database guidance mode. Please visit [${matchedScheme.official_source}](${matchedScheme.official_source}) for direct registration.*`;
+    } else if (matchedService) {
       fallbackText = `### ${matchedService.name} Guidance\n\n**Official Portal:** [${matchedService.official_website}](${matchedService.official_website})\n\n**Fee:** ${matchedService.processing_fee}\n**Processing Time:** ${matchedService.processing_time}\n\n**Key Documents Needed:**\n${(matchedService.documents || []).map(d => `- **${d.name}**: ${d.description}`).join('\n')}\n\n*Note: AI assistance is currently operating in offline database guidance mode. Please visit the official portal for live application tracking.*`;
     } else {
-      fallbackText = `GovGuide AI provides step-by-step guidance for **Passport**, **Aadhaar**, **PAN Card**, **Driving Licence**, and **Voter ID**.\n\nPlease select one of the service cards from the home page or visit official portal [india.gov.in](https://india.gov.in).`;
+      fallbackText = `GovGuide AI provides step-by-step guidance for **Passport**, **Aadhaar**, **PAN Card**, **Driving Licence**, **Voter ID**, and **Welfare Schemes** (such as *Pudhumai Penn*, *Tamil Pudhalvan*, *Kalaignar Magalir Urimai Thittam*, *Vidiyal Payanam*, *Naan Mudhalvan*).\n\nPlease select one of the cards from the Schemes or Services directory or visit official portal [india.gov.in](https://india.gov.in).`;
     }
+
+    const title = matchedScheme ? matchedScheme.name : (matchedService ? matchedService.name : undefined);
+    const source = matchedScheme ? matchedScheme.official_source : (matchedService ? matchedService.official_website : 'https://india.gov.in');
 
     return {
       answer: fallbackText,
-      service: matchedService ? matchedService.name : undefined,
-      source: matchedService ? matchedService.official_website : 'https://india.gov.in',
+      service: title,
+      source: source,
       suggestedQuestions: [
-        "What documents do I need for a passport?",
-        "How do I apply for a PAN card?",
-        "How to download e-Aadhaar?"
+        "What documents do I need for Pudhumai Penn?",
+        "How do I apply for Magalir Urimai Thittam?",
+        "What is the procedure for Tamil Pudhalvan?"
       ]
     };
   }
 }
+

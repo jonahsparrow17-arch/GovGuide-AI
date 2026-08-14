@@ -14,7 +14,6 @@ import {
 
 let db: Database | null = null;
 const dbDir = path.join(process.cwd(), 'data');
-const dbPath = path.join(dbDir, 'govguide.db');
 
 export async function getDatabase(): Promise<Database> {
   if (db) return db;
@@ -25,7 +24,7 @@ export async function getDatabase(): Promise<Database> {
     fs.mkdirSync(dbDir, { recursive: true });
   }
 
-  // Always re-initialize in memory or ensure tables exist
+  // Initialize SQLite database
   db = new SQL.Database();
   initTables(db);
   seedInitialData(db);
@@ -42,7 +41,7 @@ function initTables(database: Database) {
       short_description TEXT NOT NULL,
       full_description TEXT NOT NULL,
       category TEXT NOT NULL,
-      eligibility TEXT NOT NULL, -- JSON string
+      eligibility TEXT NOT NULL,
       official_website TEXT NOT NULL,
       processing_fee TEXT NOT NULL,
       processing_time TEXT NOT NULL,
@@ -59,7 +58,7 @@ function initTables(database: Database) {
       name TEXT NOT NULL,
       description TEXT NOT NULL,
       is_mandatory INTEGER NOT NULL,
-      accepted_options TEXT NOT NULL, -- JSON string
+      accepted_options TEXT NOT NULL,
       FOREIGN KEY (service_id) REFERENCES services(id) ON DELETE CASCADE
     );
 
@@ -101,17 +100,17 @@ function initTables(database: Database) {
       benefit TEXT NOT NULL,
       who_can_apply TEXT NOT NULL,
       what_you_get TEXT NOT NULL,
-      eligibility TEXT NOT NULL, -- JSON string
-      documents TEXT NOT NULL, -- JSON string
-      application_steps TEXT NOT NULL, -- JSON string
+      eligibility TEXT NOT NULL,
+      documents TEXT NOT NULL,
+      application_steps TEXT NOT NULL,
       status TEXT NOT NULL,
       official_source TEXT NOT NULL,
       source_verified_authority TEXT NOT NULL,
       last_verified TEXT NOT NULL,
       effective_date TEXT,
       important_notes TEXT,
-      target_demographics TEXT NOT NULL, -- JSON string
-      education_level TEXT, -- JSON string
+      target_demographics TEXT NOT NULL,
+      education_level TEXT,
       min_age INTEGER,
       max_age INTEGER,
       income_limit_annual INTEGER,
@@ -125,306 +124,282 @@ function seedInitialData(database: Database) {
   // 1. SEED 5 CORE SERVICES
   // -------------------------------------------------------------
 
-  // 1. Passport
-  database.run(`
-    INSERT INTO services (id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes)
-    VALUES (
-      1,
-      'Indian Passport',
-      'passport',
-      'Official travel and identity document for Indian citizens traveling abroad. Issued by CPV Division, Ministry of External Affairs.',
-      'An Indian Passport is a legal travel document issued by the Government of India under the Passports Act 1967. It certifies the identity and nationality of the holder for international travel and serves as primary proof of Indian citizenship. Services include Fresh Passport, Renewal/Re-issue, and Tatkaal (expedited processing).',
-      'Identity & Travel',
-      '${JSON.stringify([
+  const servicesData = [
+    {
+      id: 1,
+      name: 'Indian Passport',
+      slug: 'passport',
+      short_description: 'Official travel and identity document for Indian citizens traveling abroad. Issued by CPV Division, Ministry of External Affairs.',
+      full_description: 'An Indian Passport is a legal travel document issued by the Government of India under the Passports Act 1967. It certifies the identity and nationality of the holder for international travel and serves as primary proof of Indian citizenship. Services include Fresh Passport, Renewal/Re-issue, and Tatkaal (expedited processing).',
+      category: 'Identity & Travel',
+      eligibility: [
         'Must be an Indian citizen by birth, descent, or naturalization',
         'Must have valid address proof for the current residence (minimum 1 year of continuous stay)',
         'Must not have unresolved criminal proceedings or pending non-bailable warrants',
         'Minors (under 18 years) require consent of both parents along with parents passport copies'
-      ])}',
-      'https://passportindia.gov.in',
-      '₹1,500 (Normal 36-page, 10-year) | ₹2,000 (Normal 60-page) | ₹3,500 (Tatkaal 36-page)',
-      '10 to 15 working days (Normal) | 1 to 3 working days (Tatkaal, post-police clearance)',
-      'Consular, Passport & Visa (CPV) Division, Ministry of External Affairs (MEA)',
-      'FileText',
-      '2026-08-01',
-      'Police verification is mandatory for fresh passports. Ensure your local address matches all supporting utility or bank records exactly.'
-    );
-  `);
-
-  // Documents for Passport
-  database.run(`
-    INSERT INTO documents (service_id, category, name, description, is_mandatory, accepted_options) VALUES
-    (1, 'Proof of Date of Birth', 'DOB Certificate / Matriculation', 'Document establishing the exact birth date of the applicant.', 1, '${JSON.stringify(['Birth Certificate issued by Municipal Authority/Registrar', '10th Class / Matriculation Passing Certificate mentioning DOB', 'PAN Card issued by Income Tax Department', 'Aadhaar Card / e-Aadhaar'])}'),
-    (1, 'Proof of Present Address', 'Current Residential Address Proof', 'Document validating your current stay for the last 1 year.', 1, '${JSON.stringify(['Aadhaar Card with current address', 'Active Bank Passbook with photo & branch stamp (Scheduled Commercial Banks)', 'Electricity / Water Bill (not older than 3 months)', 'Voter ID (EPIC Card)', 'Registered Rent Agreement (minimum 1-year tenure)'])}'),
-    (1, 'Proof of Identity', 'Photo Identity Proof', 'Valid government-issued photo identity.', 1, '${JSON.stringify(['Aadhaar Card', 'Voter Identity Card', 'PAN Card', 'Driving Licence'])}'),
-    (1, 'Non-ECR Supporting Proof', 'Educational Qualification (Optional for ECNR)', 'Required for non-Emigration Check Required (ECR) category stamping.', 0, '${JSON.stringify(['Matriculation / 10th Class passing certificate or higher degree', 'Income Tax Returns proof of last 3 years', 'Proof of staying abroad for 3+ years'])}');
-  `);
-
-  // Steps for Passport
-  database.run(`
-    INSERT INTO application_steps (service_id, step_number, title, description, location_type, tip) VALUES
-    (1, 1, 'Register on Official Passport Seva Portal', 'Create an account on passportindia.gov.in. Choose your nearest Regional Passport Office (RPO) jurisdiction based on your current residential city.', 'Online', 'Do not use third-party broker websites. Official portal is passportindia.gov.in only.'),
-    (1, 2, 'Fill Online Application Form (Form 1)', 'Select "Apply for Fresh Passport / Re-issue" and carefully enter your personal details, parentage, spouse name, current address, and emergency contact.', 'Online', 'Ensure spelling matches your Matriculation certificate and Aadhaar identically.'),
-    (1, 3, 'Pay Application Fee & Schedule PSK Slot', 'Pay online via SBI ePay, Debit/Credit Card, or Internet Banking. Select your preferred Passport Seva Kendra (PSK) or Post Office PSK (POPSK) date and time slot.', 'Online', 'Slots open daily at specific regional times (usually 11:00 AM or 3:00 PM depending on state).'),
-    (1, 4, 'Visit Passport Seva Kendra (PSK) with Originals', 'Arrive 15 minutes before your scheduled appointment time. Carry ARN receipt, two sets of self-attested photocopies, and all original documents for physical biometric scanning and document counter verification (Counters A, B, and C).', 'Visit Center', 'No personal paper photographs are needed for adults; photos are captured digitally in Counter A.'),
-    (1, 5, 'Police Verification & Passport Dispatch', 'Your local police station will contact you to verify resident status. After clearance, the printed passport is securely dispatched via India Post Speed Post with SMS tracking.', 'Hybrid', 'Keep original address documents and two references ready for the police officer visit.');
-  `);
-
-  // Common Mistakes for Passport
-  database.run(`
-    INSERT INTO common_mistakes (service_id, mistake, impact, prevention) VALUES
-    (1, 'Name or Initials Discrepancy with 10th Certificate', 'Application placed on hold at Counter B; applicant referred to RPO main branch.', 'Ensure your First Name and Surname on the application match your 10th / School Leaving Certificate letter for letter.'),
-    (1, 'Unregistered / Incomplete Address History (< 1 year)', 'Police verification reports adverse remarks; penalty up to ₹5,000.', 'If you have lived at more than one address in the preceding 12 months, list all previous addresses in the history section.'),
-    (1, 'Booking through fake/fraudulent intermediary domains', 'Financial loss, stolen identity documents, and unissued appointment.', 'Only navigate to official https://passportindia.gov.in. Genuine government portals always end in .gov.in.');
-  `);
-
-  // FAQs for Passport
-  database.run(`
-    INSERT INTO service_faqs (service_id, question, answer) VALUES
-    (1, 'Is physical photograph required to be carried to the PSK for adults?', 'No. For all adult applicants, live digital photography and biometric fingerprints are captured at Counter A inside the Passport Seva Kendra.'),
-    (1, 'What is the validity of an adult Indian passport?', 'Standard adult passports are issued with 10 years of validity from the date of issue.'),
-    (1, 'Can I apply for a passport under Tatkaal scheme without an Annexure verification certificate?', 'Yes. Under revised guidelines, Tatkaal applications can be submitted with 3 accepted identity/address documents (e.g. Aadhaar, PAN, Voter ID) without needing a Class-1 officer Annexure verification certificate.');
-  `);
-
-  // 2. Aadhaar
-  database.run(`
-    INSERT INTO services (id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes)
-    VALUES (
-      2,
-      'Aadhaar Card',
-      'aadhaar',
-      '12-digit unique biometric identity number issued by UIDAI for residents of India.',
-      'Aadhaar is a 12-digit individual identification number issued by the Unique Identification Authority of India (UIDAI) on behalf of the Government of India. It serves as proof of identity and proof of address anywhere in India. UIDAI offers services for new enrollment, mandatory biometric updates for children, demographic updates, and document verification.',
-      'Identity & Resident Records',
-      '${JSON.stringify([
+      ],
+      official_website: 'https://passportindia.gov.in',
+      processing_fee: '₹1,500 (Normal 36-page, 10-year) | ₹2,000 (Normal 60-page) | ₹3,500 (Tatkaal 36-page)',
+      processing_time: '10 to 15 working days (Normal) | 1 to 3 working days (Tatkaal, post-police clearance)',
+      issuing_authority: 'Consular, Passport & Visa (CPV) Division, Ministry of External Affairs (MEA)',
+      icon: 'FileText',
+      last_verified: '2026-08-01',
+      important_notes: 'Police verification is mandatory for fresh passports. Ensure your local address matches all supporting utility or bank records exactly.',
+      documents: [
+        { category: 'Proof of Date of Birth', name: 'DOB Certificate / Matriculation', description: 'Document establishing the exact birth date of the applicant.', is_mandatory: 1, accepted_options: ['Birth Certificate issued by Municipal Authority/Registrar', '10th Class / Matriculation Passing Certificate mentioning DOB', 'PAN Card issued by Income Tax Department', 'Aadhaar Card / e-Aadhaar'] },
+        { category: 'Proof of Present Address', name: 'Current Residential Address Proof', description: 'Document validating your current stay for the last 1 year.', is_mandatory: 1, accepted_options: ['Aadhaar Card with current address', 'Active Bank Passbook with photo & branch stamp (Scheduled Commercial Banks)', 'Electricity / Water Bill (not older than 3 months)', 'Voter ID (EPIC Card)', 'Registered Rent Agreement (minimum 1-year tenure)'] },
+        { category: 'Proof of Identity', name: 'Photo Identity Proof', description: 'Valid government-issued photo identity.', is_mandatory: 1, accepted_options: ['Aadhaar Card', 'Voter Identity Card', 'PAN Card', 'Driving Licence'] },
+        { category: 'Non-ECR Supporting Proof', name: 'Educational Qualification (Optional for ECNR)', description: 'Required for non-Emigration Check Required (ECR) category stamping.', is_mandatory: 0, accepted_options: ['Matriculation / 10th Class passing certificate or higher degree', 'Income Tax Returns proof of last 3 years', 'Proof of staying abroad for 3+ years'] }
+      ],
+      steps: [
+        { step_number: 1, title: 'Register on Official Passport Seva Portal', description: 'Create an account on passportindia.gov.in. Choose your nearest Regional Passport Office (RPO) jurisdiction based on your current residential city.', location_type: 'Online', tip: 'Do not use third-party broker websites. Official portal is passportindia.gov.in only.' },
+        { step_number: 2, title: 'Fill Online Application Form (Form 1)', description: 'Select "Apply for Fresh Passport / Re-issue" and carefully enter your personal details, parentage, spouse name, current address, and emergency contact.', location_type: 'Online', tip: 'Ensure spelling matches your Matriculation certificate and Aadhaar identically.' },
+        { step_number: 3, title: 'Pay Application Fee & Schedule PSK Slot', description: 'Pay online via SBI ePay, Debit/Credit Card, or Internet Banking. Select your preferred Passport Seva Kendra (PSK) or Post Office PSK (POPSK) date and time slot.', location_type: 'Online', tip: 'Slots open daily at specific regional times (usually 11:00 AM or 3:00 PM depending on state).' },
+        { step_number: 4, title: 'Visit Passport Seva Kendra (PSK) with Originals', description: 'Arrive 15 minutes before your scheduled appointment time. Carry ARN receipt, two sets of self-attested photocopies, and all original documents for physical biometric scanning and document counter verification (Counters A, B, and C).', location_type: 'Visit Center', tip: 'No personal paper photographs are needed for adults; photos are captured digitally in Counter A.' },
+        { step_number: 5, title: 'Police Verification & Passport Dispatch', description: 'Your local police station will contact you to verify resident status. After clearance, the printed passport is securely dispatched via India Post Speed Post with SMS tracking.', location_type: 'Hybrid', tip: 'Keep original address documents and two references ready for the police officer visit.' }
+      ],
+      mistakes: [
+        { mistake: 'Name or Initials Discrepancy with 10th Certificate', impact: 'Application placed on hold at Counter B; applicant referred to RPO main branch.', prevention: 'Ensure your First Name and Surname on the application match your 10th / School Leaving Certificate letter for letter.' },
+        { mistake: 'Unregistered / Incomplete Address History (< 1 year)', impact: 'Police verification reports adverse remarks; penalty up to ₹5,000.', prevention: 'If you have lived at more than one address in the preceding 12 months, list all previous addresses in the history section.' },
+        { mistake: 'Booking through fake/fraudulent intermediary domains', impact: 'Financial loss, stolen identity documents, and unissued appointment.', prevention: 'Only navigate to official https://passportindia.gov.in. Genuine government portals always end in .gov.in.' }
+      ],
+      faqs: [
+        { question: 'Is physical photograph required to be carried to the PSK for adults?', answer: 'No. For all adult applicants, live digital photography and biometric fingerprints are captured at Counter A inside the Passport Seva Kendra.' },
+        { question: 'What is the validity of an adult Indian passport?', answer: 'Standard adult passports are issued with 10 years of validity from the date of issue.' },
+        { question: 'Can I apply for a passport under Tatkaal scheme without an Annexure verification certificate?', answer: 'Yes. Under revised guidelines, Tatkaal applications can be submitted with 3 accepted identity/address documents (e.g. Aadhaar, PAN, Voter ID) without needing a Class-1 officer Annexure verification certificate.' }
+      ]
+    },
+    {
+      id: 2,
+      name: 'Aadhaar Card',
+      slug: 'aadhaar',
+      short_description: '12-digit unique biometric identity number issued by UIDAI for residents of India.',
+      full_description: 'Aadhaar is a 12-digit individual identification number issued by the Unique Identification Authority of India (UIDAI) on behalf of the Government of India. It serves as proof of identity and proof of address anywhere in India. UIDAI offers services for new enrollment, mandatory biometric updates for children, demographic updates, and document verification.',
+      category: 'Identity & Resident Records',
+      eligibility: [
         'Must be a resident of India (resided in India for 182 days or more in the past 12 months)',
         'Available for all individuals regardless of age or gender (including newborns)',
         'Mandatory biometric update required for children upon reaching age 5 and age 15'
-      ])}',
-      'https://uidai.gov.in',
-      'Free for Fresh Enrollment & Mandatory Child Biometric Update | ₹50 for Demographic Update | ₹100 for Biometric Update',
-      '15 to 30 days (Updates often reflect within 5-7 working days online)',
-      'Unique Identification Authority of India (UIDAI), Ministry of Electronics & IT',
-      'CreditCard',
-      '2026-08-01',
-      'Always keep your mobile number linked with Aadhaar to access online OTP-based e-services and self-service address update portals.'
-    );
-  `);
-
-  // Documents for Aadhaar
-  database.run(`
-    INSERT INTO documents (service_id, category, name, description, is_mandatory, accepted_options) VALUES
-    (2, 'Proof of Identity (PoI)', 'Identity Verification Document', 'Document containing name and photograph of the resident.', 1, '${JSON.stringify(['Passport', 'PAN Card', 'Voter ID (EPIC)', 'Driving Licence', 'Ration Card / PDS Photo Card', 'Government Photo ID Card'])}'),
-    (2, 'Proof of Address (PoA)', 'Residential Verification Document', 'Document validating residential address.', 1, '${JSON.stringify(['Electricity Bill (not older than 3 months)', 'Water Bill (not older than 3 months)', 'Bank Account Statement / Passbook with photo & stamp', 'Voter ID', 'Passport', 'Registered Rent Agreement'])}'),
-    (2, 'Proof of Date of Birth (PoB)', 'Date of Birth Record', 'Document certifying legal date of birth.', 1, '${JSON.stringify(['Birth Certificate', 'SSLC / 10th Standard Passing Certificate', 'Passport', 'PAN Card'])}'),
-    (2, 'Proof of Relationship (PoR)', 'Relationship Document (For Minor Enrollment)', 'Required when enrolling child with Head of Family (HoF).', 0, '${JSON.stringify(['Birth Certificate mentioning parents names', 'Ration Card', 'Passport of Parent'])}');
-  `);
-
-  // Steps for Aadhaar
-  database.run(`
-    INSERT INTO application_steps (service_id, step_number, title, description, location_type, tip) VALUES
-    (2, 1, 'Locate Aadhaar Seva Kendra or Book Appointment Online', 'Visit myaadhaar.uidai.gov.in and click "Book an Appointment" to reserve a time slot at your nearest Aadhaar Seva Kendra (ASK) or authorized bank/post office branch.', 'Online', 'Booking an appointment online eliminates waiting in walk-in queues.'),
-    (2, 2, 'Prepare Original Documents & Enrolment Form', 'Fill out the Aadhaar Enrolment / Correction form. Keep original Proof of Identity, Address, and Date of Birth documents ready for physical scanning.', 'Offline', 'Ensure spelling matches across your identity and address documents.'),
-    (2, 3, 'Visit Enrollment Center for Biometric & Demographic Capture', 'Visit the Kendra on your appointment date. The operator captures 10 fingerprints, both iris scans, live photo, and scans original documents into the UIDAI system.', 'Visit Center', 'Verify all typed details on the operator dual-screen before biometric sign-off.'),
-    (2, 4, 'Collect Enrolment Slip (EID) with 28-digit Number', 'Obtain the physical printed acknowledgement receipt containing the 14-digit Enrolment ID and 14-digit timestamp.', 'Visit Center', 'Store this slip securely; it is required to track status or download e-Aadhaar before card dispatch.'),
-    (2, 5, 'Track Status & Download e-Aadhaar', 'Track processing status on myaadhaar.uidai.gov.in using your EID. Once generated, download password-protected e-Aadhaar PDF using OTP sent to registered mobile.', 'Online', 'The password to open e-Aadhaar is FIRST 4 LETTERS OF NAME in CAPITAL + YEAR OF BIRTH.');
-  `);
-
-  // Common Mistakes for Aadhaar
-  database.run(`
-    INSERT INTO common_mistakes (service_id, mistake, impact, prevention) VALUES
-    (2, 'Not linking an active mobile number during enrollment', 'Cannot access online update portal, DigiLocker, or instant OTP verifications.', 'Always provide your own personal active mobile number to the enrollment operator.'),
-    (2, 'Submitting unverified photocopy without showing original document', 'Application rejected instantly by UIDAI backend validation.', 'Always carry original physical documents to the center. Operators only scan originals.'),
-    (2, 'Ignoring mandatory biometric updates at age 5 and age 15', 'Aadhaar becomes dormant and fails biometric authentication for scholarships/exams.', 'Children must undergo free biometric updates between ages 5-7 and ages 15-17.');
-  `);
-
-  // FAQs for Aadhaar
-  database.run(`
-    INSERT INTO service_faqs (service_id, question, answer) VALUES
-    (2, 'Is e-Aadhaar downloaded from UIDAI website equally valid as the physical PVC card?', 'Yes. Under the Aadhaar Act, digital e-Aadhaar downloaded from uidai.gov.in is legally equivalent to the physical letter/card for all official purposes.'),
-    (2, 'Can I update my residential address in Aadhaar online without visiting a center?', 'Yes. If your mobile number is linked, you can submit an address update request on myaadhaar.uidai.gov.in by uploading a valid address proof or through Head of Family (HoF) consent.'),
-    (2, 'Is new Aadhaar enrollment free of cost?', 'Yes, fresh Aadhaar enrollment and mandatory child biometric updates at age 5 and 15 are 100% free at all authorized government centers.');
-  `);
-
-  // 3. PAN Card
-  database.run(`
-    INSERT INTO services (id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes)
-    VALUES (
-      3,
-      'PAN Card (Permanent Account Number)',
-      'pan-card',
-      '10-digit alphanumeric tax identifier issued by the Income Tax Department for financial transactions.',
-      'Permanent Account Number (PAN) is a unique 10-character alphanumeric identifier issued by the Income Tax Department of India. It serves as universal tax identification and is legally mandatory for opening bank accounts, filing tax returns, making investments, and conducting high-value financial transactions. Available via Instant e-PAN (paperless Aadhaar-based) or standard physical card application (Form 49A).',
-      'Taxation & Finance',
-      '${JSON.stringify([
+      ],
+      official_website: 'https://uidai.gov.in',
+      processing_fee: 'Free for Fresh Enrollment & Mandatory Child Biometric Update | ₹50 for Demographic Update | ₹100 for Biometric Update',
+      processing_time: '15 to 30 days (Updates often reflect within 5-7 working days online)',
+      issuing_authority: 'Unique Identification Authority of India (UIDAI), Ministry of Electronics & IT',
+      icon: 'CreditCard',
+      last_verified: '2026-08-01',
+      important_notes: 'Always keep your mobile number linked with Aadhaar to access online OTP-based e-services and self-service address update portals.',
+      documents: [
+        { category: 'Proof of Identity (PoI)', name: 'Identity Verification Document', description: 'Document containing name and photograph of the resident.', is_mandatory: 1, accepted_options: ['Passport', 'PAN Card', 'Voter ID (EPIC)', 'Driving Licence', 'Ration Card / PDS Photo Card', 'Government Photo ID Card'] },
+        { category: 'Proof of Address (PoA)', name: 'Residential Verification Document', description: 'Document validating residential address.', is_mandatory: 1, accepted_options: ['Electricity Bill (not older than 3 months)', 'Water Bill (not older than 3 months)', 'Bank Account Statement / Passbook with photo & stamp', 'Voter ID', 'Passport', 'Registered Rent Agreement'] },
+        { category: 'Proof of Date of Birth (PoB)', name: 'Date of Birth Record', description: 'Document certifying legal date of birth.', is_mandatory: 1, accepted_options: ['Birth Certificate', 'SSLC / 10th Standard Passing Certificate', 'Passport', 'PAN Card'] },
+        { category: 'Proof of Relationship (PoR)', name: 'Relationship Document (For Minor Enrollment)', description: 'Required when enrolling child with Head of Family (HoF).', is_mandatory: 0, accepted_options: ['Birth Certificate mentioning parents names', 'Ration Card', 'Passport of Parent'] }
+      ],
+      steps: [
+        { step_number: 1, title: 'Locate Aadhaar Seva Kendra or Book Appointment Online', description: 'Visit myaadhaar.uidai.gov.in and click "Book an Appointment" to reserve a time slot at your nearest Aadhaar Seva Kendra (ASK) or authorized bank/post office branch.', location_type: 'Online', tip: 'Booking an appointment online eliminates waiting in walk-in queues.' },
+        { step_number: 2, title: 'Prepare Original Documents & Enrolment Form', description: 'Fill out the Aadhaar Enrolment / Correction form. Keep original Proof of Identity, Address, and Date of Birth documents ready for physical scanning.', location_type: 'Offline', tip: 'Ensure spelling matches across your identity and address documents.' },
+        { step_number: 3, title: 'Visit Enrollment Center for Biometric & Demographic Capture', description: 'Visit the Kendra on your appointment date. The operator captures 10 fingerprints, both iris scans, live photo, and scans original documents into the UIDAI system.', location_type: 'Visit Center', tip: 'Verify all typed details on the operator dual-screen before biometric sign-off.' },
+        { step_number: 4, title: 'Collect Enrolment Slip (EID) with 28-digit Number', description: 'Obtain the physical printed acknowledgement receipt containing the 14-digit Enrolment ID and 14-digit timestamp.', location_type: 'Visit Center', tip: 'Store this slip securely; it is required to track status or download e-Aadhaar before card dispatch.' },
+        { step_number: 5, title: 'Track Status & Download e-Aadhaar', description: 'Track processing status on myaadhaar.uidai.gov.in using your EID. Once generated, download password-protected e-Aadhaar PDF using OTP sent to registered mobile.', location_type: 'Online', tip: 'The password to open e-Aadhaar is FIRST 4 LETTERS OF NAME in CAPITAL + YEAR OF BIRTH.' }
+      ],
+      mistakes: [
+        { mistake: 'Not linking an active mobile number during enrollment', impact: 'Cannot access online update portal, DigiLocker, or instant OTP verifications.', prevention: 'Always provide your own personal active mobile number to the enrollment operator.' },
+        { mistake: 'Submitting unverified photocopy without showing original document', impact: 'Application rejected instantly by UIDAI backend validation.', prevention: 'Always carry original physical documents to the center. Operators only scan originals.' },
+        { mistake: 'Ignoring mandatory biometric updates at age 5 and age 15', impact: 'Aadhaar becomes dormant and fails biometric authentication for scholarships/exams.', prevention: 'Children must undergo free biometric updates between ages 5-7 and ages 15-17.' }
+      ],
+      faqs: [
+        { question: 'Is e-Aadhaar downloaded from UIDAI website equally valid as the physical PVC card?', answer: 'Yes. Under the Aadhaar Act, digital e-Aadhaar downloaded from uidai.gov.in is legally equivalent to the physical letter/card for all official purposes.' },
+        { question: 'Can I update my residential address in Aadhaar online without visiting a center?', answer: 'Yes. If your mobile number is linked, you can submit an address update request on myaadhaar.uidai.gov.in by uploading a valid address proof or through Head of Family (HoF) consent.' },
+        { question: 'Is new Aadhaar enrollment free of cost?', answer: 'Yes, fresh Aadhaar enrollment and mandatory child biometric updates at age 5 and 15 are 100% free at all authorized government centers.' }
+      ]
+    },
+    {
+      id: 3,
+      name: 'PAN Card (Permanent Account Number)',
+      slug: 'pan-card',
+      short_description: '10-digit alphanumeric tax identifier issued by the Income Tax Department for financial transactions.',
+      full_description: 'Permanent Account Number (PAN) is a unique 10-character alphanumeric identifier issued by the Income Tax Department of India. It serves as universal tax identification and is legally mandatory for opening bank accounts, filing tax returns, making investments, and conducting high-value financial transactions. Available via Instant e-PAN (paperless Aadhaar-based) or standard physical card application (Form 49A).',
+      category: 'Taxation & Finance',
+      eligibility: [
         'Any individual Indian citizen, minor, firm, or company',
         'Instant e-PAN requires a valid Aadhaar card with an active linked mobile number and age 18+',
         'Minors (under 18) can apply for PAN Card through parent/guardian representation (Form 49A)'
-      ])}',
-      'https://www.incometax.gov.in',
-      'Free for Instant e-PAN (Digital PDF) | ₹107 (Physical Card in India) | ₹1,017 (Foreign dispatch)',
-      'Instant (10 minutes for e-PAN) | 10 to 15 working days for physical card dispatch',
-      'Income Tax Department, Ministry of Finance (Facilitated via Protean / UTIITSL)',
-      'CreditCard',
-      '2026-08-01',
-      'Instant e-PAN is 100% free of cost on incometax.gov.in. It carries the same legal validity as a laminated physical card.'
-    );
-  `);
-
-  // Documents for PAN
-  database.run(`
-    INSERT INTO documents (service_id, category, name, description, is_mandatory, accepted_options) VALUES
-    (3, 'Proof of Identity (PoI)', 'Identity Document for PAN', 'Official proof validating applicant name and photo.', 1, '${JSON.stringify(['Aadhaar Card', 'Voter ID Card', 'Passport', 'Driving Licence', 'Arm\'s Licence'])}'),
-    (3, 'Proof of Address (PoA)', 'Residential Address Proof for PAN', 'Document confirming permanent residential address.', 1, '${JSON.stringify(['Aadhaar Card', 'Voter ID', 'Passport', 'Electricity / Landline / Broadband Bill (last 3 months)', 'Bank Account Statement (last 3 months)'])}'),
-    (3, 'Proof of Date of Birth (PoB)', 'DOB Proof Document for PAN', 'Document establishing birth date.', 1, '${JSON.stringify(['Aadhaar Card', 'Birth Certificate', '10th Class Matriculation Certificate', 'Passport'])}');
-  `);
-
-  // Steps for PAN
-  database.run(`
-    INSERT INTO application_steps (service_id, step_number, title, description, location_type, tip) VALUES
-    (3, 1, 'Choose Application Route (Instant e-PAN vs Physical Card)', 'Option A: For 100% free instant paperless PAN in 10 minutes, visit incometax.gov.in e-Filing portal. Option B: For physical laminated plastic card, visit Protean (tin-nsdl.com) or UTIITSL portal (Form 49A).', 'Online', 'If you only need PAN for bank KYC or internships, Instant e-PAN is generated immediately with zero fees.'),
-    (3, 2, 'Submit Aadhaar OTP Authentication (Instant Route)', 'Enter your 12-digit Aadhaar number on the Income Tax e-Filing portal. Enter the 6-digit OTP received on your Aadhaar-linked mobile phone to validate identity.', 'Online', 'Ensure your mobile phone is charged and active to receive the Aadhaar OTP within the 10-minute timer.'),
-    (3, 3, 'Confirm Demographic Details & Generate PAN', 'The portal auto-fetches your Name, Date of Birth, Gender, Address, and Photograph directly from UIDAI database. Confirm details and submit request.', 'Online', 'Verify that your surname and father name are correctly reflected.'),
-    (3, 4, 'Download Digitally Signed e-PAN PDF', 'Check status within 10 minutes using your Aadhaar number. Download the digitally signed e-PAN PDF containing a verifiable QR code.', 'Online', 'Password to open e-PAN PDF is your Date of Birth in DDMMYYYY format without slashes.'),
-    (3, 5, 'Optional: Request Physical Reprint (₹50)', 'If you need a physical plastic laminated card later, visit the Protean/UTIITSL reprint portal, enter your newly generated PAN, pay ₹50, and it will be delivered by Speed Post.', 'Online', 'Physical reprint requests take approximately 7-10 days for home delivery.');
-  `);
-
-  // Common Mistakes for PAN
-  database.run(`
-    INSERT INTO common_mistakes (service_id, mistake, impact, prevention) VALUES
-    (3, 'Applying for multiple PAN cards', 'Possessing more than one PAN is illegal under Section 272B of Income Tax Act with penalty up to ₹10,000.', 'Never apply for a second PAN. If you lost your card, apply for Reprint/Duplicate of existing PAN.'),
-    (3, 'Mismatch between Aadhaar and Matriculation details', 'Instant e-PAN generation fails during UIDAI backend authentication.', 'Update your Aadhaar name/DOB first to match your educational certificates before generating PAN.'),
-    (3, 'Paying ₹200–₹500 to unauthorized internet cafes for Instant e-PAN', 'Unnecessary expense and exposure of private financial documents.', 'Instant e-PAN is completely free on official government portal incometax.gov.in.');
-  `);
-
-  // FAQs for PAN
-  database.run(`
-    INSERT INTO service_faqs (service_id, question, answer) VALUES
-    (3, 'Is Instant e-PAN accepted for opening bank accounts and stock demat accounts?', 'Yes. Digitally signed e-PAN issued by the Income Tax Department carries equal legal validity as the physical laminated card as per CBDT notifications.'),
-    (3, 'Can a student under 18 years get a PAN Card?', 'Yes, minors can apply for a PAN card under Form 49A with parent/guardian acting as representative assessee. Instant e-PAN requires age 18+.'),
-    (3, 'Is Aadhaar-PAN linking mandatory?', 'Yes, linking PAN with Aadhaar is legally mandatory for all individual taxpayers under the Income Tax Act.');
-  `);
-
-  // 4. Driving Licence
-  database.run(`
-    INSERT INTO services (id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes)
-    VALUES (
-      4,
-      'Driving Licence (Learner & Permanent DL)',
-      'driving-licence',
-      'Official permit to operate motor vehicles on public roads in India. Managed via MoRTH Sarathi portal.',
-      'A Driving Licence is an official document issued by state Regional Transport Offices (RTO) authorizing an individual to operate a motor vehicle on public roads. The process involves two phases: 1) Learner Licence (LL) test valid for 6 months, followed by 2) Practical driving skill test at RTO for Permanent Driving Licence (DL).',
-      'Transport & Licensing',
-      '${JSON.stringify([
+      ],
+      official_website: 'https://www.incometax.gov.in',
+      processing_fee: 'Free for Instant e-PAN (Digital PDF) | ₹107 (Physical Card in India) | ₹1,017 (Foreign dispatch)',
+      processing_time: 'Instant (10 minutes for e-PAN) | 10 to 15 working days for physical card dispatch',
+      issuing_authority: 'Income Tax Department, Ministry of Finance (Facilitated via Protean / UTIITSL)',
+      icon: 'CreditCard',
+      last_verified: '2026-08-01',
+      important_notes: 'Instant e-PAN is 100% free of cost on incometax.gov.in. It carries the same legal validity as a laminated physical card.',
+      documents: [
+        { category: 'Proof of Identity (PoI)', name: 'Identity Document for PAN', description: 'Official proof validating applicant name and photo.', is_mandatory: 1, accepted_options: ['Aadhaar Card', 'Voter ID Card', 'Passport', 'Driving Licence', "Arm's Licence"] },
+        { category: 'Proof of Address (PoA)', name: 'Residential Address Proof for PAN', description: 'Document confirming permanent residential address.', is_mandatory: 1, accepted_options: ['Aadhaar Card', 'Voter ID', 'Passport', 'Electricity / Landline / Broadband Bill (last 3 months)', 'Bank Account Statement (last 3 months)'] },
+        { category: 'Proof of Date of Birth (PoB)', name: 'DOB Proof Document for PAN', description: 'Document establishing birth date.', is_mandatory: 1, accepted_options: ['Aadhaar Card', 'Birth Certificate', '10th Class Matriculation Certificate', 'Passport'] }
+      ],
+      steps: [
+        { step_number: 1, title: 'Choose Application Route (Instant e-PAN vs Physical Card)', description: 'Option A: For 100% free instant paperless PAN in 10 minutes, visit incometax.gov.in e-Filing portal. Option B: For physical laminated plastic card, visit Protean (tin-nsdl.com) or UTIITSL portal (Form 49A).', location_type: 'Online', tip: 'If you only need PAN for bank KYC or internships, Instant e-PAN is generated immediately with zero fees.' },
+        { step_number: 2, title: 'Submit Aadhaar OTP Authentication (Instant Route)', description: 'Enter your 12-digit Aadhaar number on the Income Tax e-Filing portal. Enter the 6-digit OTP received on your Aadhaar-linked mobile phone to validate identity.', location_type: 'Online', tip: 'Ensure your mobile phone is charged and active to receive the Aadhaar OTP within the 10-minute timer.' },
+        { step_number: 3, title: 'Confirm Demographic Details & Generate PAN', description: 'The portal auto-fetches your Name, Date of Birth, Gender, Address, and Photograph directly from UIDAI database. Confirm details and submit request.', location_type: 'Online', tip: 'Verify that your surname and father name are correctly reflected.' },
+        { step_number: 4, title: 'Download Digitally Signed e-PAN PDF', description: 'Check status within 10 minutes using your Aadhaar number. Download the digitally signed e-PAN PDF containing a verifiable QR code.', location_type: 'Online', tip: 'Password to open e-PAN PDF is your Date of Birth in DDMMYYYY format without slashes.' },
+        { step_number: 5, title: 'Optional: Request Physical Reprint (₹50)', description: 'If you need a physical plastic laminated card later, visit the Protean/UTIITSL reprint portal, enter your newly generated PAN, pay ₹50, and it will be delivered by Speed Post.', location_type: 'Online', tip: 'Physical reprint requests take approximately 7-10 days for home delivery.' }
+      ],
+      mistakes: [
+        { mistake: 'Applying for multiple PAN cards', impact: 'Possessing more than one PAN is illegal under Section 272B of Income Tax Act with penalty up to ₹10,000.', prevention: 'Never apply for a second PAN. If you lost your card, apply for Reprint/Duplicate of existing PAN.' },
+        { mistake: 'Mismatch between Aadhaar and Matriculation details', impact: 'Instant e-PAN generation fails during UIDAI backend authentication.', prevention: 'Update your Aadhaar name/DOB first to match your educational certificates before generating PAN.' },
+        { mistake: 'Paying ₹200–₹500 to unauthorized internet cafes for Instant e-PAN', impact: 'Unnecessary expense and exposure of private financial documents.', prevention: 'Instant e-PAN is completely free on official government portal incometax.gov.in.' }
+      ],
+      faqs: [
+        { question: 'Is Instant e-PAN accepted for opening bank accounts and stock demat accounts?', answer: 'Yes. Digitally signed e-PAN issued by the Income Tax Department carries equal legal validity as the physical laminated card as per CBDT notifications.' },
+        { question: 'Can a student under 18 years get a PAN Card?', answer: 'Yes, minors can apply for a PAN card under Form 49A with parent/guardian acting as representative assessee. Instant e-PAN requires age 18+.' },
+        { question: 'Is Aadhaar-PAN linking mandatory?', answer: 'Yes, linking PAN with Aadhaar is legally mandatory for all individual taxpayers under the Income Tax Act.' }
+      ]
+    },
+    {
+      id: 4,
+      name: 'Driving Licence (Learner & Permanent DL)',
+      slug: 'driving-licence',
+      short_description: 'Official permit to operate motor vehicles on public roads in India. Managed via MoRTH Sarathi portal.',
+      full_description: 'A Driving Licence is an official document issued by state Regional Transport Offices (RTO) authorizing an individual to operate a motor vehicle on public roads. The process involves two phases: 1) Learner Licence (LL) test valid for 6 months, followed by 2) Practical driving skill test at RTO for Permanent Driving Licence (DL).',
+      category: 'Transport & Licensing',
+      eligibility: [
         'Age 16+ for Gearless 2-Wheeler (up to 50cc) with parent consent',
         'Age 18+ for Non-Transport light motor vehicles (Motorcycle with Gear & Car / LMV)',
         'Age 20+ for Commercial / Transport vehicles (minimum 1 year holding LMV licence)',
         'Must pass computerized traffic signals & road safety test for Learner Licence'
-      ])}',
-      'https://parivahan.gov.in',
-      '₹150 to ₹200 (Learner Licence) | ₹300 (DL Test) + ₹200 (Smart Card DL issuance)',
-      'Same day for Learner Licence (Online) | 7 to 15 days for Permanent Smart Card DL post-test',
-      'Regional Transport Offices (RTO), State Transport Departments / MoRTH',
-      'Car',
-      '2026-08-01',
-      'You can apply for Permanent DL after 30 days from Learner Licence issuance, and before expiry of 180 days (6 months).'
-    );
-  `);
-
-  // Documents for Driving Licence
-  database.run(`
-    INSERT INTO documents (service_id, category, name, description, is_mandatory, accepted_options) VALUES
-    (4, 'Proof of Age', 'Age Verification Document for DL', 'Document certifying minimum legal driving age.', 1, '${JSON.stringify(['10th Standard Matriculation Certificate', 'Birth Certificate', 'Passport', 'Aadhaar Card', 'PAN Card'])}'),
-    (4, 'Proof of Address', 'Residential Address Proof for Local RTO', 'Valid proof establishing residence under chosen RTO jurisdiction.', 1, '${JSON.stringify(['Aadhaar Card', 'Voter ID (EPIC)', 'Passport', 'Current Electricity / Water Bill', 'Registered Rent Agreement'])}'),
-    (4, 'Medical Fitness Declaration', 'Form 1 / Form 1A', 'Self-declaration of physical fitness or medical certificate.', 1, '${JSON.stringify(['Form 1 (Self-declaration for non-commercial applicants under 40)', 'Form 1A (Signed by registered MBBS Doctor for commercial or applicants above 40)'])}'),
-    (4, 'Valid Learner Licence (LL)', 'Existing Learner Licence Number', 'Mandatory for booking Permanent DL driving skill test.', 1, '${JSON.stringify(['Active Learner Licence issued at least 30 days prior'])}');
-  `);
-
-  // Steps for Driving Licence
-  database.run(`
-    INSERT INTO application_steps (service_id, step_number, title, description, location_type, tip) VALUES
-    (4, 1, 'Apply for Learner Licence on Sarathi Portal', 'Visit parivahan.gov.in -> Online Services -> Drivers/Learners Licence. Select your state and choose "Apply for Learner Licence".', 'Online', 'Select Aadhaar Authentication mode for contact-less online LL test from home in eligible states.'),
-    (4, 2, 'Complete Road Safety Tutorial & Online LL Test', 'Watch mandatory road safety educational video on Sarathi portal and take the computerized 15-question traffic signs test (Pass score: 60%+).', 'Online', 'Revise traffic signs, road lane markings, and basic vehicle hand signals before starting.'),
-    (4, 3, 'Download Form 3 Learner Licence (Valid for 6 Months)', 'Upon passing test, instantly download and print your Learner Licence (Form 3). You can now drive with a permanent DL holder beside you and "L" board displayed.', 'Online', 'Learner Licence is valid across India for 180 days.'),
-    (4, 4, 'Book Permanent DL Driving Test Slot (After 30 Days)', 'After minimum 30 days of holding LL, log in to Sarathi portal, select "Apply for Driving Licence", pay DL test fee (₹500 approx), and book an RTO test track slot.', 'Online', 'Do not delay past 5 months; LL cannot be renewed once 180 days expire without re-testing.'),
-    (4, 5, 'Appear for RTO Driving Test & Receive Smart Card', 'Bring your vehicle, active LL, insurance, PUC certificate, and original ID proofs to RTO test track. Demonstrate "H" track, "8" track, gradient start, and reverse parking.', 'Visit Center', 'Always wear seatbelt/helmet, adjust mirrors, and use turn indicators during the RTO test.');
-  `);
-
-  // Common Mistakes for Driving Licence
-  database.run(`
-    INSERT INTO common_mistakes (service_id, mistake, impact, prevention) VALUES
-    (4, 'Waiting past 180 days after LL issuance to book DL test', 'Learner Licence lapses completely; applicant must pay fees and restart LL test from beginning.', 'Book your practical test slot on Sarathi as soon as the 30-day learning window completes.'),
-    (4, 'Bringing vehicle with expired Insurance or PUC to RTO test', 'Motor Vehicle Inspector disqualifies applicant from driving test on the spot.', 'Ensure vehicle used for test has valid Pollution Certificate (PUC), active Insurance, and matching class.'),
-    (4, 'Failing to use turn indicators and mirror checks during RTO test', 'Instant deduction of driving test points leading to test failure.', 'Exaggerate head movements for rear-view mirror checks and engage indicators 30 meters before turning.');
-  `);
-
-  // FAQs for Driving Licence
-  database.run(`
-    INSERT INTO service_faqs (service_id, question, answer) VALUES
-    (4, 'Can I take the Learner Licence test from home on mobile/computer?', 'Yes. In states participating in the Aadhaar-based faceless scheme on sarathi.parivahan.gov.in, applicants with Aadhaar-linked mobile can take the online LL test from home.'),
-    (4, 'What is the minimum gap required between Learner Licence and Permanent DL test?', 'You must hold the Learner Licence for at least 30 continuous days before you become eligible to take the practical DL driving test.'),
-    (4, 'Is a digital Driving Licence stored in DigiLocker or mParivahan legally accepted during traffic police checks?', 'Yes. Digital Driving Licences and RC books in DigiLocker or mParivahan are legally recognized across India as per MoRTH notifications.');
-  `);
-
-  // 5. Voter ID
-  database.run(`
-    INSERT INTO services (id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes)
-    VALUES (
-      5,
-      'Voter ID Card (EPIC Registration)',
-      'voter-id',
-      'Elector Photo Identity Card (EPIC) issued by Election Commission of India for voting rights.',
-      'The Elector Photo Identity Card (EPIC), commonly known as Voter ID, is an identity document issued by the Election Commission of India (ECI) to adult Indian citizens. It serves as primary proof of electoral franchise, citizenship, and residential address. Services include New Voter Registration (Form 6), Overseas Citizen Registration (Form 6A), and Correction/Shifting of Residence (Form 8).',
-      'Electoral & Citizenship',
-      '${JSON.stringify([
+      ],
+      official_website: 'https://parivahan.gov.in',
+      processing_fee: '₹150 to ₹200 (Learner Licence) | ₹300 (DL Test) + ₹200 (Smart Card DL issuance)',
+      processing_time: 'Same day for Learner Licence (Online) | 7 to 15 days for Permanent Smart Card DL post-test',
+      issuing_authority: 'Regional Transport Offices (RTO), State Transport Departments / MoRTH',
+      icon: 'Car',
+      last_verified: '2026-08-01',
+      important_notes: 'You can apply for Permanent DL after 30 days from Learner Licence issuance, and before expiry of 180 days (6 months).',
+      documents: [
+        { category: 'Proof of Age', name: 'Age Verification Document for DL', description: 'Document certifying minimum legal driving age.', is_mandatory: 1, accepted_options: ['10th Standard Matriculation Certificate', 'Birth Certificate', 'Passport', 'Aadhaar Card', 'PAN Card'] },
+        { category: 'Proof of Address', name: 'Residential Address Proof for Local RTO', description: 'Valid proof establishing residence under chosen RTO jurisdiction.', is_mandatory: 1, accepted_options: ['Aadhaar Card', 'Voter ID (EPIC)', 'Passport', 'Current Electricity / Water Bill', 'Registered Rent Agreement'] },
+        { category: 'Medical Fitness Declaration', name: 'Form 1 / Form 1A', description: 'Self-declaration of physical fitness or medical certificate.', is_mandatory: 1, accepted_options: ['Form 1 (Self-declaration for non-commercial applicants under 40)', 'Form 1A (Signed by registered MBBS Doctor for commercial or applicants above 40)'] },
+        { category: 'Valid Learner Licence (LL)', name: 'Existing Learner Licence Number', description: 'Mandatory for booking Permanent DL driving skill test.', is_mandatory: 1, accepted_options: ['Active Learner Licence issued at least 30 days prior'] }
+      ],
+      steps: [
+        { step_number: 1, title: 'Apply for Learner Licence on Sarathi Portal', description: 'Visit parivahan.gov.in -> Online Services -> Drivers/Learners Licence. Select your state and choose "Apply for Learner Licence".', location_type: 'Online', tip: 'Select Aadhaar Authentication mode for contact-less online LL test from home in eligible states.' },
+        { step_number: 2, title: 'Complete Road Safety Tutorial & Online LL Test', description: 'Watch mandatory road safety educational video on Sarathi portal and take the computerized 15-question traffic signs test (Pass score: 60%+).', location_type: 'Online', tip: 'Revise traffic signs, road lane markings, and basic vehicle hand signals before starting.' },
+        { step_number: 3, title: 'Download Form 3 Learner Licence (Valid for 6 Months)', description: 'Upon passing test, instantly download and print your Learner Licence (Form 3). You can now drive with a permanent DL holder beside you and "L" board displayed.', location_type: 'Online', tip: 'Learner Licence is valid across India for 180 days.' },
+        { step_number: 4, title: 'Book Permanent DL Driving Test Slot (After 30 Days)', description: 'After minimum 30 days of holding LL, log in to Sarathi portal, select "Apply for Driving Licence", pay DL test fee (₹500 approx), and book an RTO test track slot.', location_type: 'Online', tip: 'Do not delay past 5 months; LL cannot be renewed once 180 days expire without re-testing.' },
+        { step_number: 5, title: 'Appear for RTO Driving Test & Receive Smart Card', description: 'Bring your vehicle, active LL, insurance, PUC certificate, and original ID proofs to RTO test track. Demonstrate "H" track, "8" track, gradient start, and reverse parking.', location_type: 'Visit Center', tip: 'Always wear seatbelt/helmet, adjust mirrors, and use turn indicators during the RTO test.' }
+      ],
+      mistakes: [
+        { mistake: 'Waiting past 180 days after LL issuance to book DL test', impact: 'Learner Licence lapses completely; applicant must pay fees and restart LL test from beginning.', prevention: 'Book your practical test slot on Sarathi as soon as the 30-day learning window completes.' },
+        { mistake: 'Bringing vehicle with expired Insurance or PUC to RTO test', impact: 'Motor Vehicle Inspector disqualifies applicant from driving test on the spot.', prevention: 'Ensure vehicle used for test has valid Pollution Certificate (PUC), active Insurance, and matching class.' },
+        { mistake: 'Failing to use turn indicators and mirror checks during RTO test', impact: 'Instant deduction of driving test points leading to test failure.', prevention: 'Exaggerate head movements for rear-view mirror checks and engage indicators 30 meters before turning.' }
+      ],
+      faqs: [
+        { question: 'Can I take the Learner Licence test from home on mobile/computer?', answer: 'Yes. In states participating in the Aadhaar-based faceless scheme on sarathi.parivahan.gov.in, applicants with Aadhaar-linked mobile can take the online LL test from home.' },
+        { question: 'What is the minimum gap required between Learner Licence and Permanent DL test?', answer: 'You must hold the Learner Licence for at least 30 continuous days before you become eligible to take the practical DL driving test.' },
+        { question: 'Is a digital Driving Licence stored in DigiLocker or mParivahan legally accepted during traffic police checks?', answer: 'Yes. Digital Driving Licences and RC books in DigiLocker or mParivahan are legally recognized across India as per MoRTH notifications.' }
+      ]
+    },
+    {
+      id: 5,
+      name: 'Voter ID Card (EPIC Registration)',
+      slug: 'voter-id',
+      short_description: 'Elector Photo Identity Card (EPIC) issued by Election Commission of India for voting rights.',
+      full_description: 'The Elector Photo Identity Card (EPIC), commonly known as Voter ID, is an identity document issued by the Election Commission of India (ECI) to adult Indian citizens. It serves as primary proof of electoral franchise, citizenship, and residential address. Services include New Voter Registration (Form 6), Overseas Citizen Registration (Form 6A), and Correction/Shifting of Residence (Form 8).',
+      category: 'Electoral & Citizenship',
+      eligibility: [
         'Must be an Indian citizen',
         'Must be 18 years of age or older on the qualifying date (1st of Jan, April, July, or Oct)',
         'Must be ordinarily resident in the constituency/assembly area where applying',
         'Must not be disqualified as an elector under any law'
-      ])}',
-      'https://voters.eci.gov.in',
-      '100% Free of Cost (New Registration & Corrections)',
-      '15 to 30 days (Digital e-EPIC available immediately upon ERO approval)',
-      'Election Commission of India (ECI) & State Chief Electoral Officers (CEO)',
-      'FileCheck',
-      '2026-08-01',
-      'Citizens turning 18 can now register in advance on four qualifying dates (Jan 1, Apr 1, Jul 1, Oct 1) on voters.eci.gov.in.'
+      ],
+      official_website: 'https://voters.eci.gov.in',
+      processing_fee: '100% Free of Cost (New Registration & Corrections)',
+      processing_time: '15 to 30 days (Digital e-EPIC available immediately upon ERO approval)',
+      issuing_authority: 'Election Commission of India (ECI) & State Chief Electoral Officers (CEO)',
+      icon: 'FileCheck',
+      last_verified: '2026-08-01',
+      important_notes: 'Citizens turning 18 can now register in advance on four qualifying dates (Jan 1, Apr 1, Jul 1, Oct 1) on voters.eci.gov.in.',
+      documents: [
+        { category: 'Proof of Age', name: 'Age Proof Document for Voter ID', description: 'Document establishing age 18+ on qualifying date.', is_mandatory: 1, accepted_options: ['Birth Certificate', 'Aadhaar Card', 'PAN Card', 'Driving Licence', '10th / 12th CBSE/State Board Passing Certificate', 'Indian Passport'] },
+        { category: 'Proof of Ordinary Residence', name: 'Current Residential Address Proof', description: 'Document validating your stay in the constituency.', is_mandatory: 1, accepted_options: ['Aadhaar Card', 'Water / Electricity / Gas Connection Bill (1 year)', 'Current Bank Passbook with address', 'Indian Passport', 'Registered Rent Agreement / Sale Deed'] },
+        { category: 'Passport-size Photograph', name: 'Recent Color Photograph', description: 'White background passport photo for EPIC card.', is_mandatory: 1, accepted_options: ['Recent color photograph (4.5cm x 3.5cm) with frontal face view'] }
+      ],
+      steps: [
+        { step_number: 1, title: 'Visit Official ECI Voters Service Portal', description: 'Go to voters.eci.gov.in (or download Voter Helpline Mobile App). Sign up using your mobile number and email.', location_type: 'Online', tip: 'Do not use unverified third-party voter portals. ECI official portal is voters.eci.gov.in.' },
+        { step_number: 2, title: 'Fill Form 6 (New Voter Registration)', description: 'Select "Form 6 - Application for New Voters". Choose your State, District, and Parliamentary / Assembly Constituency.', location_type: 'Online', tip: 'Check which Assembly Constituency your street falls under before starting.' },
+        { step_number: 3, title: 'Enter Personal Details & Upload Documents', description: 'Enter personal name, family member details, current residential address, and upload self-attested copies of Age Proof, Address Proof, and Photo.', location_type: 'Online', tip: 'Ensure the uploaded photo has a clear plain white background and is under 2MB.' },
+        { step_number: 4, title: 'Submit Declaration & Note Reference Number', description: 'Review your entries, complete the legal declaration, and submit. You will receive an instant 12-character Reference ID via SMS to track your application.', location_type: 'Online', tip: 'Save the SMS Reference ID to check Booth Level Officer (BLO) verification status.' },
+        { step_number: 5, title: 'BLO Field Verification & e-EPIC Download', description: 'Your assigned Booth Level Officer (BLO) may visit your residence to verify address. Once approved by Electoral Registration Officer (ERO), download your digital e-EPIC card instantly with photo and QR code.', location_type: 'Hybrid', tip: 'Digital e-EPIC can be downloaded instantly from the portal and carries 100% legal validity for voting.' }
+      ],
+      mistakes: [
+        { mistake: 'Filling Form 6 when already registered in another constituency', impact: 'Dual enrollment in electoral roll is a punishable offense under Section 31 of Representation of the People Act 1950.', prevention: 'If shifting residence to a new house/city, use Form 8 (Shifting of Residence), never Form 6.' },
+        { mistake: 'Entering wrong Assembly Constituency number', impact: 'Application forwarded to incorrect Electoral Registration Officer causing rejection.', prevention: 'Look up your polling booth or ask family members for the exact Assembly Constituency name.' },
+        { mistake: 'Uploading blurred photograph or cropped selfie', impact: 'EPIC printed with unrecognized photo or rejected during administrative review.', prevention: 'Upload a clean, high-resolution passport-style photo with neutral expression.' }
+      ],
+      faqs: [
+        { question: 'Is there any fee to apply for a Voter ID Card?', answer: 'No. Voter ID registration (Form 6) and correction (Form 8) are 100% free of cost on the ECI portal.' },
+        { question: 'Can I vote if I have an e-EPIC digital copy on my mobile phone?', answer: 'Yes, as long as your name is listed on the active Electoral Roll, you can vote at your assigned polling booth showing your Voter ID or accepted alternative photo identity proofs (e.g. Aadhaar, Driving Licence, Passport).' },
+        { question: 'What is the qualifying date for turning 18 to register as a voter?', answer: 'ECI has 4 qualifying dates every year: January 1, April 1, July 1, and October 1. You can submit advance applications in the quarter you turn 18.' }
+      ]
+    }
+  ];
+
+  for (const s of servicesData) {
+    database.run(
+      `INSERT INTO services (
+        id, name, slug, short_description, full_description, category, eligibility,
+        official_website, processing_fee, processing_time, issuing_authority, icon,
+        last_verified, important_notes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        s.id,
+        s.name,
+        s.slug,
+        s.short_description,
+        s.full_description,
+        s.category,
+        JSON.stringify(s.eligibility),
+        s.official_website,
+        s.processing_fee,
+        s.processing_time,
+        s.issuing_authority,
+        s.icon,
+        s.last_verified,
+        s.important_notes
+      ]
     );
-  `);
 
-  // Documents for Voter ID
-  database.run(`
-    INSERT INTO documents (service_id, category, name, description, is_mandatory, accepted_options) VALUES
-    (5, 'Proof of Age', 'Age Proof Document for Voter ID', 'Document establishing age 18+ on qualifying date.', 1, '${JSON.stringify(['Birth Certificate', 'Aadhaar Card', 'PAN Card', 'Driving Licence', '10th / 12th CBSE/State Board Passing Certificate', 'Indian Passport'])}'),
-    (5, 'Proof of Ordinary Residence', 'Current Residential Address Proof', 'Document validating your stay in the constituency.', 1, '${JSON.stringify(['Aadhaar Card', 'Water / Electricity / Gas Connection Bill (1 year)', 'Current Bank Passbook with address', 'Indian Passport', 'Registered Rent Agreement / Sale Deed'])}'),
-    (5, 'Passport-size Photograph', 'Recent Color Photograph', 'White background passport photo for EPIC card.', 1, '${JSON.stringify(['Recent color photograph (4.5cm x 3.5cm) with frontal face view'])}');
-  `);
+    for (const doc of s.documents) {
+      database.run(
+        `INSERT INTO documents (service_id, category, name, description, is_mandatory, accepted_options)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [s.id, doc.category, doc.name, doc.description, doc.is_mandatory, JSON.stringify(doc.accepted_options)]
+      );
+    }
 
-  // Steps for Voter ID
-  database.run(`
-    INSERT INTO application_steps (service_id, step_number, title, description, location_type, tip) VALUES
-    (5, 1, 'Visit Official ECI Voters Service Portal', 'Go to voters.eci.gov.in (or download Voter Helpline Mobile App). Sign up using your mobile number and email.', 'Online', 'Do not use unverified third-party voter portals. ECI official portal is voters.eci.gov.in.'),
-    (5, 2, 'Fill Form 6 (New Voter Registration)', 'Select "Form 6 - Application for New Voters". Choose your State, District, and Parliamentary / Assembly Constituency.', 'Online', 'Check which Assembly Constituency your street falls under before starting.'),
-    (5, 3, 'Enter Personal Details & Upload Documents', 'Enter personal name, family member details, current residential address, and upload self-attested copies of Age Proof, Address Proof, and Photo.', 'Online', 'Ensure the uploaded photo has a clear plain white background and is under 2MB.'),
-    (5, 4, 'Submit Declaration & Note Reference Number', 'Review your entries, complete the legal declaration, and submit. You will receive an instant 12-character Reference ID via SMS to track your application.', 'Online', 'Save the SMS Reference ID to check Booth Level Officer (BLO) verification status.'),
-    (5, 5, 'BLO Field Verification & e-EPIC Download', 'Your assigned Booth Level Officer (BLO) may visit your residence to verify address. Once approved by Electoral Registration Officer (ERO), download your digital e-EPIC card instantly with photo and QR code.', 'Hybrid', 'Digital e-EPIC can be downloaded instantly from the portal and carries 100% legal validity for voting.');
-  `);
+    for (const step of s.steps) {
+      database.run(
+        `INSERT INTO application_steps (service_id, step_number, title, description, location_type, tip)
+         VALUES (?, ?, ?, ?, ?, ?)`,
+        [s.id, step.step_number, step.title, step.description, step.location_type, step.tip || null]
+      );
+    }
 
-  // Common Mistakes for Voter ID
-  database.run(`
-    INSERT INTO common_mistakes (service_id, mistake, impact, prevention) VALUES
-    (5, 'Filling Form 6 when already registered in another constituency', 'Dual enrollment in electoral roll is a punishable offense under Section 31 of Representation of the People Act 1950.', 'If shifting residence to a new house/city, use Form 8 (Shifting of Residence), never Form 6.'),
-    (5, 'Entering wrong Assembly Constituency number', 'Application forwarded to incorrect Electoral Registration Officer causing rejection.', 'Look up your polling booth or ask family members for the exact Assembly Constituency name.'),
-    (5, 'Uploading blurred photograph or cropped selfie', 'EPIC printed with unrecognized photo or rejected during administrative review.', 'Upload a clean, high-resolution passport-style photo with neutral expression.');
-  `);
+    for (const m of s.mistakes) {
+      database.run(
+        `INSERT INTO common_mistakes (service_id, mistake, impact, prevention)
+         VALUES (?, ?, ?, ?)`,
+        [s.id, m.mistake, m.impact, m.prevention]
+      );
+    }
 
-  // FAQs for Voter ID
-  database.run(`
-    INSERT INTO service_faqs (service_id, question, answer) VALUES
-    (5, 'Is there any fee to apply for a Voter ID Card?', 'No. Voter ID registration (Form 6) and correction (Form 8) are 100% free of cost on the ECI portal.'),
-    (5, 'Can I vote if I have an e-EPIC digital copy on my mobile phone?', 'Yes, as long as your name is listed on the active Electoral Roll, you can vote at your assigned polling booth showing your Voter ID or accepted alternative photo identity proofs (e.g. Aadhaar, Driving Licence, Passport).'),
-    (5, 'What is the qualifying date for turning 18 to register as a voter?', 'ECI has 4 qualifying dates every year: January 1, April 1, July 1, and October 1. You can submit advance applications in the quarter you turn 18.');
-  `);
+    for (const f of s.faqs) {
+      database.run(
+        `INSERT INTO service_faqs (service_id, question, answer)
+         VALUES (?, ?, ?)`,
+        [s.id, f.question, f.answer]
+      );
+    }
+  }
 
   // -------------------------------------------------------------
   // 2. SEED GOVERNMENT SCHEMES (WITH TRUST SYSTEM & 8 CATEGORIES)
@@ -438,33 +413,33 @@ function seedInitialData(database: Database) {
       category: 'Education & Students',
       department: 'Department of Social Welfare & Women Empowerment, Government of Tamil Nadu',
       state_or_central: 'Tamil Nadu State Government',
-      benefit: '₹1,000 per month direct bank transfer (DBT)',
-      who_can_apply: 'Girl students who studied from Class 6 to Class 12 in Tamil Nadu Government Schools and are pursuing higher education.',
-      what_you_get: 'A monthly financial assistance of ₹1,000 deposited directly into the student\'s Aadhaar-linked bank account until completion of undergraduate degree, diploma, or ITI course.',
+      benefit: '₹1,000 per month (Direct Benefit Transfer)',
+      who_can_apply: 'Female students who studied Class 6 to 12 in Tamil Nadu Government schools and are pursuing higher education.',
+      what_you_get: 'Monthly financial assistance of ₹1,000 deposited directly into the student\'s Aadhaar-linked bank account until completion of undergraduate degree, diploma, or ITI course.',
       eligibility: [
-        'Must be a female student',
-        'Must have studied continuously from Class 6 to 12 in Tamil Nadu Government Schools (or Model/Corporation schools)',
-        'Must be enrolled in recognized higher education (UG Degree, Engineering, Medicine, Agriculture, Arts & Science, Diploma, or ITI)',
-        'No income ceiling limit applies'
+        'Permanent female resident / student of Tamil Nadu',
+        'Studied continuously from Class 6 to 12 in Tamil Nadu Government Schools (including Model, Corporation, and Municipal schools)',
+        'Actively enrolled in recognized Higher Education (Undergraduate Degree, Engineering, Medicine, Arts & Science, Diploma, or ITI)',
+        'No household income ceiling limit applies'
       ],
       documents: [
-        'Aadhaar Card of the student',
-        'Active Bank Account Passbook (with IFSC and Aadhaar linked)',
-        'Class 10 and Class 12 Marksheets / EMIS ID proof of Government School education',
+        'Aadhaar Card of the female student',
+        'Active Bank Account Passbook (Aadhaar-linked with NPCI DBT mapping)',
+        'EMIS ID / Class 6 to 12 Government School Study Certificate',
         'College / Polytechnic / ITI Admission Proof & Bonafide Certificate'
       ],
       steps: [
-        { step_number: 1, title: 'College Verification on UMIS Portal', description: 'During admission, student provides EMIS number to college nodal officer for verification on penkalvi.tn.gov.in portal.', location_type: 'Online' },
-        { step_number: 2, title: 'Document & Aadhaar Seeding Check', description: 'Department verifies government school study history and confirms Aadhaar-linked DBT bank account.', location_type: 'Online' },
-        { step_number: 3, title: 'Monthly DBT Disbursement', description: 'Upon approval, ₹1,000 is credited monthly directly into the beneficiary bank account without any intermediary.', location_type: 'Online' }
+        { step_number: 1, title: 'College Portal Enrollment (UMIS / Penkalvi)', description: 'During admission, student provides EMIS number to college nodal officer for verification on penkalvi.tn.gov.in portal.', location_type: 'Online' },
+        { step_number: 2, title: 'Institutional & Aadhaar DBT Seeding Check', description: 'Department verifies government school study history and confirms Aadhaar-linked DBT bank account.', location_type: 'Online' },
+        { step_number: 3, title: 'Monthly DBT Disbursement', description: 'Upon verification, ₹1,000 is credited monthly directly into the student\'s bank account.', location_type: 'Online' }
       ],
       status: 'VERIFIED',
       official_source: 'https://penkalvi.tn.gov.in',
-      source_verified_authority: 'Social Welfare & Women Empowerment Dept, TN',
-      last_verified: '2026-08-01',
+      source_verified_authority: 'Department of Social Welfare & Women Empowerment, Government of Tamil Nadu',
+      last_verified: '2026-08-14',
       effective_date: '2022-09-05',
-      important_notes: 'Students can avail this scheme alongside other Merit and Post-Matric scholarships without restriction.',
-      target_demographics: ['student', 'women', 'college', 'girl student'],
+      important_notes: 'Can be availed alongside other merit scholarships without restriction.',
+      target_demographics: ['student', 'women', 'college', 'girl student', 'female student'],
       education_level: ['College', 'ITI / Polytechnic', 'Graduate'],
       min_age: 17,
       max_age: 26,
@@ -476,40 +451,40 @@ function seedInitialData(database: Database) {
       category: 'Education & Students',
       department: 'Department of Higher Education, Government of Tamil Nadu',
       state_or_central: 'Tamil Nadu State Government',
-      benefit: '₹1,000 per month direct bank transfer (DBT)',
-      who_can_apply: 'Boy students who studied from Class 6 to Class 12 in Tamil Nadu Government Schools and enrolled in higher education.',
-      what_you_get: 'Monthly financial assistance of ₹1,000 to assist boy students from government schools in purchasing textbooks, study materials, and managing college living expenses.',
+      benefit: '₹1,000 per month (Direct Benefit Transfer)',
+      who_can_apply: 'Male students who studied Class 6 to 12 in Tamil Nadu Government schools and are pursuing higher education.',
+      what_you_get: 'Monthly financial assistance of ₹1,000 deposited directly into the student\'s Aadhaar-linked bank account to support college living, books, and study materials.',
       eligibility: [
-        'Must be a male student',
-        'Must have completed Class 6 to 12 in Tamil Nadu Government schools (including Tamil medium in aided schools)',
-        'Must be actively enrolled in Undergraduate Degree, Professional Courses (Engineering/Law/Medicine), Diploma, or ITI programs',
+        'Permanent male student of Tamil Nadu',
+        'Studied continuously from Class 6 to 12 in Tamil Nadu Government Schools (including Tamil medium in aided schools)',
+        'Actively enrolled in recognized Higher Education (Undergraduate Degree, Engineering, Medicine, Law, Arts & Science, Diploma, or ITI)',
         'Valid Aadhaar-seeded bank account in student\'s own name'
       ],
       documents: [
-        'Aadhaar Card',
-        'EMIS Number / School Study Certificate (Classes 6 to 12)',
-        'College Bonafide Certificate & Identity Card',
-        'Bank Account Passbook (Aadhaar linked)'
+        'Aadhaar Card of the male student',
+        'EMIS Number / School Study Certificate (Classes 6 to 12 Government School)',
+        'College / Polytechnic / ITI Bonafide Certificate & Student ID Card',
+        'Active Bank Account Passbook (Aadhaar linked for DBT)'
       ],
       steps: [
-        { step_number: 1, title: 'Registration via College Portal', description: 'Submit your EMIS details to your college designated scholarship desk during admission.', location_type: 'Online' },
-        { step_number: 2, title: 'Institutional Verification', description: 'Higher education institution verifies student attendance and enrollment on the state portal.', location_type: 'Online' },
-        { step_number: 3, title: 'Monthly Credit via DBT', description: 'Monthly ₹1,000 allowance is disbursed directly to the verified bank account.', location_type: 'Online' }
+        { step_number: 1, title: 'College Portal Registration (UMIS)', description: 'Submit EMIS details and admission credentials to college scholarship desk.', location_type: 'Online' },
+        { step_number: 2, title: 'Institutional & Aadhaar Verification', description: 'College verifies government school attendance records and confirms active bank DBT linkage.', location_type: 'Online' },
+        { step_number: 3, title: 'Monthly DBT Disbursement', description: 'Monthly ₹1,000 is credited directly to the student\'s verified bank account.', location_type: 'Online' }
       ],
       status: 'VERIFIED',
       official_source: 'https://umis.tn.gov.in',
-      source_verified_authority: 'Higher Education Department, Government of Tamil Nadu',
-      last_verified: '2026-08-01',
+      source_verified_authority: 'Department of Higher Education, Government of Tamil Nadu',
+      last_verified: '2026-08-14',
       effective_date: '2024-08-09',
-      important_notes: 'Aadhaar seeding with bank account (NPCI mapping) is mandatory to receive the DBT credit.',
-      target_demographics: ['student', 'boy student', 'youth', 'college'],
+      important_notes: 'Aadhaar seeding with bank account (NPCI mapping) is mandatory to receive DBT payments.',
+      target_demographics: ['student', 'boy student', 'male student', 'youth', 'college'],
       education_level: ['College', 'ITI / Polytechnic', 'Graduate'],
       min_age: 17,
       max_age: 26,
       gender: 'Male'
     },
     {
-      name: 'Perunthalaivar Kamarajar Free Breakfast Scheme (Chief Minister\'s Breakfast Scheme)',
+      name: "Perunthalaivar Kamarajar Free Breakfast Scheme (Chief Minister's Breakfast Scheme)",
       slug: 'chief-ministers-breakfast-scheme',
       category: 'Education & Students',
       department: 'Social Welfare & Nutritious Meal Programme Department, Tamil Nadu',
@@ -621,28 +596,31 @@ function seedInitialData(database: Database) {
       category: 'Women & Family',
       department: 'Transport Department, Government of Tamil Nadu',
       state_or_central: 'Tamil Nadu State Government',
-      benefit: '100% Free Travel on all Ordinary Town Buses',
-      who_can_apply: 'All women, transwomen, and persons with disabilities accompanied by an attendant.',
-      what_you_get: 'Free travel across all government-operated state transport corporation (TNSTC/MTC) white-board ordinary town buses in Tamil Nadu with zero ticket charges.',
+      benefit: '100% Free Bus Travel on Ordinary Town Buses',
+      who_can_apply: 'All women, transwomen, female students, and persons with disabilities.',
+      what_you_get: 'Free travel across all government-operated state transport corporation (TNSTC/MTC) white-board ordinary town buses in Tamil Nadu with zero ticket fare.',
       eligibility: [
-        'All female residents of all age groups (children, students, working women, senior citizens)',
-        'Transgender women / Persons with disability',
-        'Applicable on all ordinary fare town buses (White Board buses)'
+        'All women / female residents of Tamil Nadu (no age limit)',
+        'Transgender women / persons',
+        'Female students and working women',
+        'Differently abled persons and accompanied escorts',
+        'Applicable on all Ordinary Fare (White Board) Town / City Buses operated by State Transport Corporations'
       ],
       documents: [
-        'No pass or ID registration required; zero-fare ticket is issued by the bus conductor on board.'
+        'No registration or ID pass required',
+        'Zero-fare paper ticket issued directly by bus conductor on board for transit auditing'
       ],
       steps: [
-        { step_number: 1, title: 'Board Ordinary Town Bus', description: 'Board any ordinary (white board / destination board) city/town government bus in Tamil Nadu.', location_type: 'Offline' },
-        { step_number: 2, title: 'Collect Zero-Rupee Travel Ticket', description: 'Conductor issues a ₹0 ticket for passenger counting and government subsidy settlement.', location_type: 'Offline' }
+        { step_number: 1, title: 'Board Ordinary Town Bus', description: 'Board any ordinary (white board / destination board) city or town government bus in Tamil Nadu.', location_type: 'Offline' },
+        { step_number: 2, title: 'Receive Zero-Fare Passenger Ticket', description: 'Conductor issues a ₹0 ticket on board without requiring any document verification.', location_type: 'Offline' }
       ],
-      status: 'VERIFIED',
+      status: 'ACTIVE',
       official_source: 'https://transport.tn.gov.in',
-      source_verified_authority: 'Government of Tamil Nadu',
-      last_verified: '2026-08-01',
+      source_verified_authority: 'Transport Department, Government of Tamil Nadu',
+      last_verified: '2026-08-14',
       effective_date: '2021-05-08',
-      important_notes: 'Covers over 5 million women daily commuters across Tamil Nadu, promoting economic mobility and savings.',
-      target_demographics: ['women', 'mother', 'female', 'senior citizen', 'student'],
+      important_notes: 'Valid exclusively on Ordinary (White Board) Town Buses. Not applicable on Deluxe, Express, or AC buses.',
+      target_demographics: ['women', 'mother', 'female', 'senior citizen', 'student', 'transgender'],
       gender: 'Female'
     },
     {
@@ -651,34 +629,35 @@ function seedInitialData(database: Database) {
       category: 'Women & Family',
       department: 'Special Programme Implementation Department & Revenue Administration, Tamil Nadu',
       state_or_central: 'Tamil Nadu State Government',
-      benefit: '₹1,000 per month direct bank transfer (DBT)',
-      who_can_apply: 'Eligible female heads of households in Tamil Nadu meeting basic income and asset criteria.',
-      what_you_get: 'Monthly basic income support of ₹1,000 deposited on the 15th of every month into the woman\'s bank account to recognize unpaid domestic labor and improve family financial security.',
+      benefit: '₹1,000 per month (Direct Benefit Transfer)',
+      who_can_apply: 'Permanent female resident heads of families in Tamil Nadu meeting basic income and asset criteria.',
+      what_you_get: 'Monthly basic income support of ₹1,000 deposited directly into the woman\'s bank account on the 15th of every month via DBT.',
       eligibility: [
-        'Must be a woman aged 21 years or older',
-        'Must be designated as the Female Head in the Family Smart Ration Card',
-        'Annual family income should be below ₹2,50,000',
-        'Family landholding less than 5 acres (wetland) or 10 acres (dryland)',
-        'Annual household electricity consumption below 3,600 units'
+        'Permanent female resident of Tamil Nadu aged 21 years or older',
+        'Must be listed as the female head of family on the Smart Family Ration Card',
+        'Household annual income must be under ₹2.5 Lakh (₹2,50,000 per annum)',
+        'Landholding under 5 acres (wetland) or under 10 acres (dryland)',
+        'Household annual electricity consumption under 3,600 units/year',
+        'Family must not own a four-wheeler / car (except commercial livelihood vehicles like tractor/auto)'
       ],
       documents: [
-        'Smart Family Ration Card (showing applicant as female head)',
-        'Aadhaar Card of the applicant',
-        'Bank Account Passbook (Aadhaar linked for DBT)',
-        'Electricity Consumer Number (TANGEDCO receipt)'
+        'Smart Family Ration Card (showing applicant as female head of family)',
+        'Aadhaar Card of the female applicant',
+        'Bank Account Passbook (Aadhaar linked with NPCI DBT enabled)',
+        'Electricity Consumer Number (TANGEDCO billing receipt)'
       ],
       steps: [
-        { step_number: 1, title: 'Camp Registration / e-Sevai Application', description: 'Apply at special ration shop camps or designated e-Sevai centers with biometric verification.', location_type: 'Offline' },
-        { step_number: 2, title: 'Field & Aadhaar DBT Verification', description: 'Revenue staff verify ration card and land/power consumption records.', location_type: 'Online' },
-        { step_number: 3, title: 'Monthly Direct Transfer', description: '₹1,000 is credited automatically to the bank account with SMS alert on the 15th of every month.', location_type: 'Online' }
+        { step_number: 1, title: 'Application Submission via e-Sevai / Ration Camp', description: 'Apply at designated e-Sevai center or ration shop camp with biometric / OTP verification.', location_type: 'Offline' },
+        { step_number: 2, title: 'Database & Field Verification', description: 'Automated verification against revenue, land registry, and TANGEDCO power consumption databases.', location_type: 'Online' },
+        { step_number: 3, title: 'Monthly DBT Disbursement', description: '₹1,000 credited automatically to the Aadhaar-linked bank account on the 15th of every month with SMS notification.', location_type: 'Online' }
       ],
       status: 'VERIFIED',
       official_source: 'https://kmut.tn.gov.in',
-      source_verified_authority: 'Revenue Administration & SPI Dept, TN',
-      last_verified: '2026-08-01',
+      source_verified_authority: 'Revenue Administration & Special Programme Implementation Department, Tamil Nadu',
+      last_verified: '2026-08-14',
       effective_date: '2023-09-15',
-      important_notes: 'Over 1.15 crore women in Tamil Nadu currently benefit from this basic income entitlement.',
-      target_demographics: ['women', 'mother', 'homemaker', 'head of family'],
+      important_notes: 'Only one eligible adult woman per Smart Ration Card can receive the monthly ₹1,000 entitlement.',
+      target_demographics: ['women', 'mother', 'homemaker', 'head of family', 'female'],
       min_age: 21,
       max_age: 99,
       income_limit_annual: 250000,
@@ -730,29 +709,30 @@ function seedInitialData(database: Database) {
       category: 'Employment & Skills',
       department: 'Tamil Nadu Skill Development Corporation (TNSDC), Government of Tamil Nadu',
       state_or_central: 'Tamil Nadu State Government',
-      benefit: '100% Free Industry-Certified Skill Courses, Mentorship & Campus Placement',
-      who_can_apply: 'College students studying in Engineering, Arts & Science, ITI, and Polytechnic colleges in Tamil Nadu.',
-      what_you_get: 'Free access to high-demand industry curriculum (Data Science, Cloud Computing, AI, Robotics, Banking & Financial Markets, Spoken English, Competitive Exam Coaching) integrated into university semester credits with placement drives.',
+      benefit: 'Free Industry-Aligned Skill Certification & Career Mentorship',
+      who_can_apply: 'College, University, Engineering, Polytechnic, and ITI students in Tamil Nadu.',
+      what_you_get: '100% free access to high-demand technology, engineering, financial markets, and communication skill tracks integrated directly into college semester curricula with state placement support.',
       eligibility: [
-        'Enrolled in recognized College / Polytechnic / University in Tamil Nadu',
-        'Undergraduate and Postgraduate students across all years'
+        'Enrolled in recognized Higher Educational Institutions (Engineering, Arts & Science, ITI, Polytechnic, or State Universities) in Tamil Nadu',
+        'Undergraduate and Postgraduate students across all academic years',
+        'No restriction on family income or community'
       ],
       documents: [
-        'College Student ID Card & EMIS / Roll Number',
+        'College Student ID Card & Institutional EMIS / Roll Number',
         'Aadhaar Card'
       ],
       steps: [
-        { step_number: 1, title: 'Login via naanmudhalvan.tn.gov.in', description: 'Register with college institutional email / student ID.', location_type: 'Online' },
-        { step_number: 2, title: 'Select Domain Track', description: 'Choose your specialized industry course (e.g. Full Stack, AI, Cambridge English, UPSC foundation).', location_type: 'Online' },
-        { step_number: 3, title: 'Certification & Placement Drives', description: 'Complete practical labs and participate in state mega job fairs organized under Naan Mudhalvan.', location_type: 'Hybrid' }
+        { step_number: 1, title: 'Portal Login via naanmudhalvan.tn.gov.in', description: 'Log in using your college institutional credentials / student registration number.', location_type: 'Online' },
+        { step_number: 2, title: 'Select Industry Specialization Track', description: 'Choose from specialized emerging technology tracks (AI/ML, Cloud, Data Analytics, Electric Mobility, Cambridge English, Banking).', location_type: 'Online' },
+        { step_number: 3, title: 'Coursework, Assessment & Placement Drives', description: 'Complete practical laboratory projects, earn verified certifications, and participate in state-level placement drives.', location_type: 'Hybrid' }
       ],
-      status: 'VERIFIED',
+      status: 'ACTIVE',
       official_source: 'https://naanmudhalvan.tn.gov.in',
       source_verified_authority: 'Tamil Nadu Skill Development Corporation (TNSDC)',
-      last_verified: '2026-08-01',
+      last_verified: '2026-08-14',
       effective_date: '2022-03-01',
-      important_notes: 'Over 1.5 million college students trained annually across 1,500+ higher educational institutions.',
-      target_demographics: ['student', 'job seeker', 'youth', 'college'],
+      important_notes: 'Provides industry-aligned learning tracks in collaboration with global tech and industry partners.',
+      target_demographics: ['student', 'job seeker', 'youth', 'college', 'engineering', 'polytechnic'],
       education_level: ['College', 'ITI / Polytechnic', 'Graduate'],
       min_age: 17,
       max_age: 28,
@@ -1014,38 +994,39 @@ function seedInitialData(database: Database) {
   ];
 
   for (const s of schemesData) {
-    database.run(`
-      INSERT INTO schemes (
+    database.run(
+      `INSERT INTO schemes (
         name, slug, category, department, state_or_central, benefit, who_can_apply, what_you_get,
         eligibility, documents, application_steps, status, official_source,
         source_verified_authority, last_verified, effective_date, important_notes,
         target_demographics, education_level, min_age, max_age, income_limit_annual, gender
-      ) VALUES (
-        '${s.name.replace(/'/g, "''")}',
-        '${s.slug}',
-        '${s.category}',
-        '${s.department.replace(/'/g, "''")}',
-        '${s.state_or_central.replace(/'/g, "''")}',
-        '${s.benefit.replace(/'/g, "''")}',
-        '${s.who_can_apply.replace(/'/g, "''")}',
-        '${s.what_you_get.replace(/'/g, "''")}',
-        '${JSON.stringify(s.eligibility).replace(/'/g, "''")}',
-        '${JSON.stringify(s.documents).replace(/'/g, "''")}',
-        '${JSON.stringify(s.steps).replace(/'/g, "''")}',
-        '${s.status}',
-        '${s.official_source}',
-        '${s.source_verified_authority.replace(/'/g, "''")}',
-        '${s.last_verified}',
-        ${s.effective_date ? `'${s.effective_date}'` : 'NULL'},
-        ${s.important_notes ? `'${s.important_notes.replace(/'/g, "''")}'` : 'NULL'},
-        '${JSON.stringify(s.target_demographics).replace(/'/g, "''")}',
-        ${s.education_level ? `'${JSON.stringify(s.education_level).replace(/'/g, "''")}'` : 'NULL'},
-        ${s.min_age !== undefined ? s.min_age : 'NULL'},
-        ${s.max_age !== undefined ? s.max_age : 'NULL'},
-        ${s.income_limit_annual !== undefined ? s.income_limit_annual : 'NULL'},
-        ${s.gender ? `'${s.gender}'` : 'NULL'}
-      );
-    `);
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        s.name,
+        s.slug,
+        s.category,
+        s.department,
+        s.state_or_central,
+        s.benefit,
+        s.who_can_apply,
+        s.what_you_get,
+        JSON.stringify(s.eligibility),
+        JSON.stringify(s.documents),
+        JSON.stringify(s.steps),
+        s.status,
+        s.official_source,
+        s.source_verified_authority,
+        s.last_verified,
+        s.effective_date || null,
+        s.important_notes || null,
+        JSON.stringify(s.target_demographics),
+        s.education_level ? JSON.stringify(s.education_level) : null,
+        s.min_age !== undefined ? s.min_age : null,
+        s.max_age !== undefined ? s.max_age : null,
+        s.income_limit_annual !== undefined ? s.income_limit_annual : null,
+        s.gender || 'All'
+      ]
+    );
   }
 }
 
@@ -1055,42 +1036,54 @@ function seedInitialData(database: Database) {
 
 export async function getAllServices(): Promise<GovernmentService[]> {
   const database = await getDatabase();
-  const res = database.exec(`
-    SELECT id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes
+  const stmt = database.prepare(`
+    SELECT id, name, slug, short_description, full_description, category, eligibility,
+           official_website, processing_fee, processing_time, issuing_authority, icon,
+           last_verified, important_notes
     FROM services
     ORDER BY id ASC
   `);
 
-  if (!res.length || !res[0].values) return [];
-
-  const columns = res[0].columns;
-  return res[0].values.map((row) => {
+  const results: GovernmentService[] = [];
+  while (stmt.step()) {
+    const row = stmt.get();
+    const cols = stmt.getColumnNames();
     const obj: any = {};
-    columns.forEach((col, idx) => {
+    cols.forEach((col, idx) => {
       obj[col] = row[idx];
     });
-    return {
+    results.push({
       ...obj,
       overview: obj.full_description,
       processing_information: `${obj.processing_fee}. ${obj.processing_time}`,
       eligibility: JSON.parse(obj.eligibility || '[]')
-    };
-  });
+    });
+  }
+  stmt.free();
+  return results;
 }
 
 export async function getServiceBySlug(slug: string): Promise<GovernmentService | null> {
   const database = await getDatabase();
-  const serviceRes = database.exec(`
-    SELECT id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes
+  const stmt = database.prepare(`
+    SELECT id, name, slug, short_description, full_description, category, eligibility,
+           official_website, processing_fee, processing_time, issuing_authority, icon,
+           last_verified, important_notes
     FROM services
-    WHERE slug = '${slug.replace(/'/g, "''")}'
+    WHERE slug = ?
     LIMIT 1
   `);
+  stmt.bind([slug]);
 
-  if (!serviceRes.length || !serviceRes[0].values.length) return null;
+  if (!stmt.step()) {
+    stmt.free();
+    return null;
+  }
 
-  const row = serviceRes[0].values[0];
-  const columns = serviceRes[0].columns;
+  const row = stmt.get();
+  const columns = stmt.getColumnNames();
+  stmt.free();
+
   const serviceObj: any = {};
   columns.forEach((col, idx) => {
     serviceObj[col] = row[idx];
@@ -1099,99 +1092,111 @@ export async function getServiceBySlug(slug: string): Promise<GovernmentService 
   const serviceId = serviceObj.id;
 
   // Documents
-  const docsRes = database.exec(`
+  const docStmt = database.prepare(`
     SELECT id, service_id, category, name, description, is_mandatory, accepted_options
     FROM documents
-    WHERE service_id = ${serviceId}
+    WHERE service_id = ?
     ORDER BY id ASC
   `);
-  const documents: DocumentRequirement[] = docsRes.length && docsRes[0].values
-    ? docsRes[0].values.map((dRow) => {
-        const dObj: any = {};
-        docsRes[0].columns.forEach((col, idx) => {
-          dObj[col] = dRow[idx];
-        });
-        return {
-          id: dObj.id,
-          service_id: dObj.service_id,
-          category: dObj.category,
-          name: dObj.name,
-          description: dObj.description,
-          is_mandatory: Boolean(dObj.is_mandatory),
-          accepted_options: JSON.parse(dObj.accepted_options || '[]')
-        };
-      })
-    : [];
+  docStmt.bind([serviceId]);
+  const documents: DocumentRequirement[] = [];
+  while (docStmt.step()) {
+    const dRow = docStmt.get();
+    const dCols = docStmt.getColumnNames();
+    const dObj: any = {};
+    dCols.forEach((c, i) => {
+      dObj[c] = dRow[i];
+    });
+    documents.push({
+      id: dObj.id,
+      service_id: dObj.service_id,
+      category: dObj.category,
+      name: dObj.name,
+      description: dObj.description,
+      is_mandatory: Boolean(dObj.is_mandatory),
+      accepted_options: JSON.parse(dObj.accepted_options || '[]')
+    });
+  }
+  docStmt.free();
 
   // Steps
-  const stepsRes = database.exec(`
+  const stepStmt = database.prepare(`
     SELECT id, service_id, step_number, title, description, location_type, tip
     FROM application_steps
-    WHERE service_id = ${serviceId}
+    WHERE service_id = ?
     ORDER BY step_number ASC
   `);
-  const steps: ApplicationStep[] = stepsRes.length && stepsRes[0].values
-    ? stepsRes[0].values.map((sRow) => {
-        const sObj: any = {};
-        stepsRes[0].columns.forEach((col, idx) => {
-          sObj[col] = sRow[idx];
-        });
-        return {
-          id: sObj.id,
-          service_id: sObj.service_id,
-          step_number: sObj.step_number,
-          title: sObj.title,
-          description: sObj.description,
-          location_type: sObj.location_type as any,
-          tip: sObj.tip || undefined
-        };
-      })
-    : [];
+  stepStmt.bind([serviceId]);
+  const steps: ApplicationStep[] = [];
+  while (stepStmt.step()) {
+    const sRow = stepStmt.get();
+    const sCols = stepStmt.getColumnNames();
+    const sObj: any = {};
+    sCols.forEach((c, i) => {
+      sObj[c] = sRow[i];
+    });
+    steps.push({
+      id: sObj.id,
+      service_id: sObj.service_id,
+      step_number: sObj.step_number,
+      title: sObj.title,
+      description: sObj.description,
+      location_type: sObj.location_type as any,
+      tip: sObj.tip || undefined
+    });
+  }
+  stepStmt.free();
 
   // Mistakes
-  const mistakesRes = database.exec(`
+  const mistakeStmt = database.prepare(`
     SELECT id, service_id, mistake, impact, prevention
     FROM common_mistakes
-    WHERE service_id = ${serviceId}
+    WHERE service_id = ?
     ORDER BY id ASC
   `);
-  const mistakes: CommonMistake[] = mistakesRes.length && mistakesRes[0].values
-    ? mistakesRes[0].values.map((mRow) => {
-        const mObj: any = {};
-        mistakesRes[0].columns.forEach((col, idx) => {
-          mObj[col] = mRow[idx];
-        });
-        return {
-          id: mObj.id,
-          service_id: mObj.service_id,
-          mistake: mObj.mistake,
-          impact: mObj.impact,
-          prevention: mObj.prevention
-        };
-      })
-    : [];
+  mistakeStmt.bind([serviceId]);
+  const mistakes: CommonMistake[] = [];
+  while (mistakeStmt.step()) {
+    const mRow = mistakeStmt.get();
+    const mCols = mistakeStmt.getColumnNames();
+    const mObj: any = {};
+    mCols.forEach((c, i) => {
+      mObj[c] = mRow[i];
+    });
+    mistakes.push({
+      id: mObj.id,
+      service_id: mObj.service_id,
+      mistake: mObj.mistake,
+      impact: mObj.impact,
+      prevention: mObj.prevention
+    });
+  }
+  mistakeStmt.free();
 
   // FAQs
-  const faqsRes = database.exec(`
+  const faqStmt = database.prepare(`
     SELECT id, service_id, question, answer
     FROM service_faqs
-    WHERE service_id = ${serviceId}
+    WHERE service_id = ?
     ORDER BY id ASC
   `);
-  const faqs: ServiceFAQ[] = faqsRes.length && faqsRes[0].values
-    ? faqsRes[0].values.map((fRow) => {
-        const fObj: any = {};
-        faqsRes[0].columns.forEach((col, idx) => {
-          fObj[col] = fRow[idx];
-        });
-        return {
-          id: fObj.id,
-          service_id: fObj.service_id,
-          question: fObj.question,
-          answer: fObj.answer
-        };
-      })
-    : [];
+  faqStmt.bind([serviceId]);
+  const faqs: ServiceFAQ[] = [];
+  while (faqStmt.step()) {
+    const fRow = faqStmt.get();
+    const fCols = faqStmt.getColumnNames();
+    const fObj: any = {};
+    fCols.forEach((c, i) => {
+      fObj[c] = fRow[i];
+    });
+    faqs.push({
+      id: fObj.id,
+      service_id: fObj.service_id,
+      question: fObj.question,
+      answer: fObj.answer
+    });
+  }
+  faqStmt.free();
 
   return {
     ...serviceObj,
@@ -1236,9 +1241,9 @@ function mapSchemeRow(columns: string[], row: any[]): GovernmentScheme {
     important_notes: obj.important_notes || undefined,
     target_demographics: JSON.parse(obj.target_demographics || '[]'),
     education_level: obj.education_level ? JSON.parse(obj.education_level) : undefined,
-    min_age: obj.min_age !== null ? obj.min_age : undefined,
-    max_age: obj.max_age !== null ? obj.max_age : undefined,
-    income_limit_annual: obj.income_limit_annual !== null ? obj.income_limit_annual : undefined,
+    min_age: obj.min_age !== null && obj.min_age !== undefined ? obj.min_age : undefined,
+    max_age: obj.max_age !== null && obj.max_age !== undefined ? obj.max_age : undefined,
+    income_limit_annual: obj.income_limit_annual !== null && obj.income_limit_annual !== undefined ? obj.income_limit_annual : undefined,
     gender: obj.gender || 'All'
   };
 }
@@ -1246,35 +1251,46 @@ function mapSchemeRow(columns: string[], row: any[]): GovernmentScheme {
 export async function getAllSchemes(category?: string, status?: string): Promise<GovernmentScheme[]> {
   const database = await getDatabase();
   let query = `SELECT * FROM schemes WHERE 1=1`;
+  const params: any[] = [];
 
   if (category && category.trim()) {
-    query += ` AND category = '${category.replace(/'/g, "''")}'`;
+    query += ` AND category = ?`;
+    params.push(category.trim());
   }
   if (status && status.trim()) {
-    query += ` AND status = '${status.replace(/'/g, "''")}'`;
+    query += ` AND status = ?`;
+    params.push(status.trim());
   }
 
   query += ` ORDER BY id ASC`;
 
-  const res = database.exec(query);
-  if (!res.length || !res[0].values) return [];
-
-  const columns = res[0].columns;
-  return res[0].values.map((row) => mapSchemeRow(columns, row));
+  const stmt = database.prepare(query);
+  stmt.bind(params);
+  const results: GovernmentScheme[] = [];
+  while (stmt.step()) {
+    const row = stmt.get();
+    const cols = stmt.getColumnNames();
+    results.push(mapSchemeRow(cols, row));
+  }
+  stmt.free();
+  return results;
 }
 
 export async function getSchemeBySlug(slug: string): Promise<GovernmentScheme | null> {
   const database = await getDatabase();
-  const res = database.exec(`SELECT * FROM schemes WHERE slug = '${slug.replace(/'/g, "''")}' LIMIT 1`);
+  const stmt = database.prepare(`SELECT * FROM schemes WHERE slug = ? LIMIT 1`);
+  stmt.bind([slug]);
 
-  if (!res.length || !res[0].values.length) return null;
-  return mapSchemeRow(res[0].columns, res[0].values[0]);
+  let result: GovernmentScheme | null = null;
+  if (stmt.step()) {
+    result = mapSchemeRow(stmt.getColumnNames(), stmt.get());
+  }
+  stmt.free();
+  return result;
 }
 
 export async function findSchemesForCitizen(profile: CitizenProfile): Promise<SchemeMatchResult[]> {
-  const database = await getDatabase();
   const allSchemes = await getAllSchemes();
-
   const results: SchemeMatchResult[] = [];
 
   for (const scheme of allSchemes) {
@@ -1374,31 +1390,36 @@ export async function findSchemesForCitizen(profile: CitizenProfile): Promise<Sc
 export async function searchServices(query: string): Promise<GovernmentService[]> {
   const database = await getDatabase();
   const q = `%${query.toLowerCase()}%`;
-  const res = database.exec(`
-    SELECT id, name, slug, short_description, full_description, category, eligibility, official_website, processing_fee, processing_time, issuing_authority, icon, last_verified, important_notes
+  const stmt = database.prepare(`
+    SELECT id, name, slug, short_description, full_description, category, eligibility,
+           official_website, processing_fee, processing_time, issuing_authority, icon,
+           last_verified, important_notes
     FROM services
-    WHERE LOWER(name) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(short_description) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(full_description) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(category) LIKE '${q.replace(/'/g, "''")}'
+    WHERE LOWER(name) LIKE ?
+       OR LOWER(short_description) LIKE ?
+       OR LOWER(full_description) LIKE ?
+       OR LOWER(category) LIKE ?
     ORDER BY id ASC
   `);
+  stmt.bind([q, q, q, q]);
 
-  if (!res.length || !res[0].values) return [];
-
-  const columns = res[0].columns;
-  return res[0].values.map((row) => {
+  const results: GovernmentService[] = [];
+  while (stmt.step()) {
+    const row = stmt.get();
+    const cols = stmt.getColumnNames();
     const obj: any = {};
-    columns.forEach((col, idx) => {
+    cols.forEach((col, idx) => {
       obj[col] = row[idx];
     });
-    return {
+    results.push({
       ...obj,
       overview: obj.full_description,
       processing_information: `${obj.processing_fee}. ${obj.processing_time}`,
       eligibility: JSON.parse(obj.eligibility || '[]')
-    };
-  });
+    });
+  }
+  stmt.free();
+  return results;
 }
 
 export async function searchUnified(query: string): Promise<{
@@ -1410,20 +1431,25 @@ export async function searchUnified(query: string): Promise<{
 
   const services = await searchServices(query);
 
-  const schemeRes = database.exec(`
+  const stmt = database.prepare(`
     SELECT * FROM schemes
-    WHERE LOWER(name) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(category) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(benefit) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(who_can_apply) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(what_you_get) LIKE '${q.replace(/'/g, "''")}'
-       OR LOWER(department) LIKE '${q.replace(/'/g, "''")}'
+    WHERE LOWER(name) LIKE ?
+       OR LOWER(category) LIKE ?
+       OR LOWER(benefit) LIKE ?
+       OR LOWER(who_can_apply) LIKE ?
+       OR LOWER(what_you_get) LIKE ?
+       OR LOWER(department) LIKE ?
     ORDER BY id ASC
   `);
+  stmt.bind([q, q, q, q, q, q]);
 
-  const schemes = schemeRes.length && schemeRes[0].values
-    ? schemeRes[0].values.map((row) => mapSchemeRow(schemeRes[0].columns, row))
-    : [];
+  const schemes: GovernmentScheme[] = [];
+  while (stmt.step()) {
+    const row = stmt.get();
+    const cols = stmt.getColumnNames();
+    schemes.push(mapSchemeRow(cols, row));
+  }
+  stmt.free();
 
   return { services, schemes };
 }
