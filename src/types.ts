@@ -133,5 +133,87 @@ export interface ChatResponse {
   source?: string;
   suggestedQuestions?: string[];
   groundingContext?: string[];
+  disclaimer?: string;
+  related_schemes?: string[];
+  related_services?: string[];
+  sources?: string[];
 }
+
+export interface SchemeCategoryCount {
+  category: SchemeCategory;
+  count: number;
+  description: string;
+  icon: string;
+}
+
+export interface EligibilityCheckRequest {
+  age?: number;
+  state?: string;
+  occupation?: string;
+  education_level?: string;
+  gender?: string;
+  annual_income?: number;
+  is_differently_abled?: boolean;
+  category_interest?: string;
+  scheme_slug?: string;
+}
+
+export interface EligibilityCheckResult {
+  scheme_id: string;
+  scheme_name: string;
+  category: SchemeCategory;
+  benefit: string;
+  match_level: 'high' | 'possible' | 'more_info_needed';
+  matched_rules: string[];
+  unverified_requirements: string[];
+  explanation: string;
+  official_url: string;
+}
+
+export interface ChecklistItemRecord {
+  id: string;
+  checklist_id: string;
+  title: string;
+  description?: string;
+  required: boolean;
+  completed: boolean;
+  source?: string;
+}
+
+export interface ChecklistRecord {
+  id: string;
+  title: string;
+  target_slug?: string;
+  target_type?: 'service' | 'scheme';
+  items: ChecklistItemRecord[];
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SourceRecord {
+  id: string;
+  url: string;
+  domain: string;
+  title: string;
+  government_department: string;
+  source_type: string;
+  verification_status: TrustStatus;
+  last_verified: string;
+  associated_slug?: string;
+}
+
+export interface ApiErrorResponse {
+  success: false;
+  error: {
+    code: string;
+    message: string;
+    details?: any;
+  };
+}
+
+export interface ApiSuccessResponse<T> {
+  success: true;
+  data: T;
+}
+
 

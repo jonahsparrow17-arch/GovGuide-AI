@@ -9,7 +9,15 @@ import {
   CommonMistake,
   ServiceFAQ,
   CitizenProfile,
-  SchemeMatchResult
+  SchemeMatchResult,
+  SchemeCategoryCount,
+  EligibilityCheckRequest,
+  EligibilityCheckResult,
+  SourceRecord,
+  ChecklistRecord,
+  ChecklistItemRecord,
+  SchemeCategory,
+  TrustStatus
 } from '../types.js';
 
 let db: Database | null = null;
@@ -115,6 +123,38 @@ function initTables(database: Database) {
       max_age INTEGER,
       income_limit_annual INTEGER,
       gender TEXT
+    );
+
+    CREATE TABLE IF NOT EXISTS checklists (
+      id TEXT PRIMARY KEY,
+      title TEXT NOT NULL,
+      target_slug TEXT,
+      target_type TEXT,
+      created_at TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS checklist_items (
+      id TEXT PRIMARY KEY,
+      checklist_id TEXT NOT NULL,
+      title TEXT NOT NULL,
+      description TEXT,
+      required INTEGER NOT NULL DEFAULT 1,
+      completed INTEGER NOT NULL DEFAULT 0,
+      source TEXT,
+      FOREIGN KEY (checklist_id) REFERENCES checklists(id) ON DELETE CASCADE
+    );
+
+    CREATE TABLE IF NOT EXISTS sources (
+      id TEXT PRIMARY KEY,
+      url TEXT NOT NULL,
+      domain TEXT NOT NULL,
+      title TEXT NOT NULL,
+      government_department TEXT NOT NULL,
+      source_type TEXT NOT NULL,
+      verification_status TEXT NOT NULL,
+      last_verified TEXT NOT NULL,
+      associated_slug TEXT
     );
   `);
 }
@@ -1028,6 +1068,34 @@ function seedInitialData(database: Database) {
       ]
     );
   }
+
+  // -------------------------------------------------------------
+  // 3. SEED OFFICIAL SOURCES
+  // -------------------------------------------------------------
+  const sourcesData = [
+    { id: 'src-passport', url: 'https://passportindia.gov.in', domain: 'passportindia.gov.in', title: 'Passport Seva Portal', government_department: 'Consular, Passport and Visa (CPV) Division, MEA', source_type: 'Central Government Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'passport' },
+    { id: 'src-aadhaar', url: 'https://uidai.gov.in', domain: 'uidai.gov.in', title: 'Unique Identification Authority of India (UIDAI)', government_department: 'Ministry of Electronics & Information Technology (MeitY)', source_type: 'Statutory Authority', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'aadhaar' },
+    { id: 'src-pan', url: 'https://incometax.gov.in', domain: 'incometax.gov.in', title: 'Income Tax e-Filing Portal', government_department: 'Central Board of Direct Taxes (CBDT), Ministry of Finance', source_type: 'Central Government Department', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'pan-card' },
+    { id: 'src-dl', url: 'https://parivahan.gov.in', domain: 'parivahan.gov.in', title: 'Sarathi Parivahan Citizen Portal', government_department: 'Ministry of Road Transport and Highways (MoRTH)', source_type: 'Central Government Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'driving-licence' },
+    { id: 'src-voter', url: 'https://voters.eci.gov.in', domain: 'voters.eci.gov.in', title: 'Voter Services Portal', government_department: 'Election Commission of India (ECI)', source_type: 'Constitutional Body', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'voter-id' },
+    { id: 'src-pudhumai', url: 'https://penkalvi.tn.gov.in', domain: 'penkalvi.tn.gov.in', title: 'Pudhumai Penn / Moovalur Portal', government_department: 'Department of Social Welfare & Women Empowerment, Government of Tamil Nadu', source_type: 'State Government Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'pudhumai-penn' },
+    { id: 'src-pudhalvan', url: 'https://umis.tn.gov.in', domain: 'umis.tn.gov.in', title: 'Tamil Pudhalvan Higher Education Portal', government_department: 'Department of Higher Education, Government of Tamil Nadu', source_type: 'State Government Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'tamil-pudhalvan' },
+    { id: 'src-kmut', url: 'https://kmut.tn.gov.in', domain: 'kmut.tn.gov.in', title: 'Kalaignar Magalir Urimai Thittam', government_department: 'Special Programme Implementation Department, Tamil Nadu', source_type: 'State Government Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'kalaignar-magalir-urimai-thittam' },
+    { id: 'src-vidiyal', url: 'https://transport.tn.gov.in', domain: 'transport.tn.gov.in', title: 'Tamil Nadu Transport Department', government_department: 'Transport Department, Government of Tamil Nadu', source_type: 'State Government Department', verification_status: 'ACTIVE', last_verified: '2026-08-14', associated_slug: 'vidiyal-payanam-women-bus-travel' },
+    { id: 'src-naanmudhalvan', url: 'https://naanmudhalvan.tn.gov.in', domain: 'naanmudhalvan.tn.gov.in', title: 'Naan Mudhalvan Skill Portal', government_department: 'Tamil Nadu Skill Development Corporation (TNSDC)', source_type: 'State Skill Portal', verification_status: 'ACTIVE', last_verified: '2026-08-14', associated_slug: 'naan-mudhalvan' },
+    { id: 'src-pmkisan', url: 'https://pmkisan.gov.in', domain: 'pmkisan.gov.in', title: 'PM-KISAN Samman Nidhi Portal', government_department: 'Ministry of Agriculture and Farmers Welfare, GoI', source_type: 'National Welfare Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'pm-kisan-income-support' },
+    { id: 'src-oap', url: 'https://nsap.nic.in', domain: 'nsap.nic.in', title: 'National Social Assistance Programme (NSAP)', government_department: 'Ministry of Rural Development & Social Welfare TN', source_type: 'National Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'old-age-pension-scheme' },
+    { id: 'src-housing', url: 'https://pmayg.nic.in', domain: 'pmayg.nic.in', title: 'Pradhan Mantri Awas Yojana - Gramin', government_department: 'Ministry of Rural Development & RDPR TN', source_type: 'National Housing Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'pm-awas-yojana-housing' },
+    { id: 'src-disability', url: 'https://swims.tn.gov.in', domain: 'swims.tn.gov.in', title: 'Differently Abled Welfare Board', government_department: 'Welfare of Differently Abled Persons Department, TN', source_type: 'State Welfare Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'differently-abled-maintenance-allowance' }
+  ];
+
+  for (const src of sourcesData) {
+    database.run(
+      `INSERT INTO sources (id, url, domain, title, government_department, source_type, verification_status, last_verified, associated_slug)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [src.id, src.url, src.domain, src.title, src.government_department, src.source_type, src.verification_status, src.last_verified, src.associated_slug]
+    );
+  }
 }
 
 // -------------------------------------------------------------
@@ -1453,3 +1521,420 @@ export async function searchUnified(query: string): Promise<{
 
   return { services, schemes };
 }
+
+// -------------------------------------------------------------
+// SCHEME CATEGORIES WITH ACCURATE COUNTS
+// -------------------------------------------------------------
+
+export async function getSchemeCategoriesWithCounts(): Promise<SchemeCategoryCount[]> {
+  const database = await getDatabase();
+  const allCategories: { category: SchemeCategory; description: string; icon: string }[] = [
+    { category: 'Education & Students', description: 'Scholarships, higher education assistance, free travel passes & meal support', icon: 'GraduationCap' },
+    { category: 'Women & Family', description: 'Basic income rights, marriage welfare aid, free bus transport & nutrition', icon: 'HeartHandshake' },
+    { category: 'Employment & Skills', description: 'Skill certification, campus career tracks & apprenticeship programs', icon: 'Briefcase' },
+    { category: 'Differently Abled', description: 'Monthly disability maintenance allowance, assistive devices & travel concessions', icon: 'Accessibility' },
+    { category: 'Senior Citizens', description: 'Monthly old age security pensions, subsidized ration & health care support', icon: 'Users' },
+    { category: 'Housing / Welfare', description: 'Rural & urban housing construction subsidies, sanitation & pucca house grants', icon: 'Home' },
+    { category: 'Livelihood', description: 'Direct income support for farmers, street vendors & micro-entrepreneur credit', icon: 'Coins' },
+    { category: 'Other Government Schemes', description: 'Transgender social welfare, artisan grants & community initiatives', icon: 'ShieldCheck' }
+  ];
+
+  const results: SchemeCategoryCount[] = [];
+
+  for (const cat of allCategories) {
+    const stmt = database.prepare(`SELECT COUNT(*) as count FROM schemes WHERE category = ?`);
+    stmt.bind([cat.category]);
+    let count = 0;
+    if (stmt.step()) {
+      count = stmt.get()[0] as number;
+    }
+    stmt.free();
+
+    results.push({
+      category: cat.category,
+      count,
+      description: cat.description,
+      icon: cat.icon
+    });
+  }
+
+  return results;
+}
+
+// -------------------------------------------------------------
+// STRUCTURED ELIGIBILITY ENGINE (RULE EVALUATOR)
+// -------------------------------------------------------------
+
+export async function checkEligibilityRules(request: EligibilityCheckRequest): Promise<EligibilityCheckResult[]> {
+  const allSchemes = await getAllSchemes(request.category_interest);
+  const results: EligibilityCheckResult[] = [];
+
+  for (const scheme of allSchemes) {
+    // If a specific scheme was requested
+    if (request.scheme_slug && scheme.slug !== request.scheme_slug) {
+      continue;
+    }
+
+    const matchedRules: string[] = [];
+    const unverifiedRequirements: string[] = [];
+    let isDisqualified = false;
+    let score = 0;
+
+    // 1. Gender Rule
+    if (scheme.gender && scheme.gender !== 'All') {
+      if (request.gender) {
+        if (request.gender.toLowerCase() === scheme.gender.toLowerCase() || (scheme.gender === 'Female' && request.gender.toLowerCase() === 'women')) {
+          matchedRules.push(`Target gender matched: ${scheme.gender}`);
+          score += 25;
+        } else {
+          isDisqualified = true;
+        }
+      } else {
+        unverifiedRequirements.push(`Scheme is exclusively for ${scheme.gender} applicants`);
+      }
+    } else {
+      matchedRules.push('Open to all genders');
+      score += 10;
+    }
+
+    if (isDisqualified) continue;
+
+    // 2. Age Rule
+    if (request.age !== undefined) {
+      const minAge = scheme.min_age ?? 0;
+      const maxAge = scheme.max_age ?? 120;
+
+      if (request.age >= minAge && request.age <= maxAge) {
+        matchedRules.push(`Age ${request.age} is within eligible bracket (${minAge}–${maxAge} years)`);
+        score += 25;
+      } else {
+        isDisqualified = true;
+      }
+    } else if (scheme.min_age !== undefined || scheme.max_age !== undefined) {
+      unverifiedRequirements.push(`Requires age between ${scheme.min_age ?? 0} and ${scheme.max_age ?? 120} years`);
+    }
+
+    if (isDisqualified) continue;
+
+    // 3. Occupation / Demographics Rule
+    if (request.occupation) {
+      const occLower = request.occupation.toLowerCase();
+      const hasDemoMatch = scheme.target_demographics.some(d => d.toLowerCase().includes(occLower) || occLower.includes(d.toLowerCase()));
+      if (hasDemoMatch) {
+        matchedRules.push(`Applicant profile matches target demographic: ${request.occupation}`);
+        score += 25;
+      }
+    }
+
+    // 4. Education Level Rule
+    if (scheme.education_level && scheme.education_level.length > 0) {
+      if (request.education_level) {
+        const eduMatch = scheme.education_level.some(e => e.toLowerCase() === request.education_level?.toLowerCase());
+        if (eduMatch) {
+          matchedRules.push(`Education level matches: ${request.education_level}`);
+          score += 20;
+        } else {
+          unverifiedRequirements.push(`Specifically intended for ${scheme.education_level.join(' / ')}`);
+        }
+      } else {
+        unverifiedRequirements.push(`Applicable for students in ${scheme.education_level.join(' / ')}`);
+      }
+    }
+
+    // 5. Annual Income Rule
+    if (scheme.income_limit_annual !== undefined) {
+      if (request.annual_income !== undefined) {
+        if (request.annual_income <= scheme.income_limit_annual) {
+          matchedRules.push(`Annual income (₹${request.annual_income.toLocaleString('en-IN')}) is within ceiling (₹${scheme.income_limit_annual.toLocaleString('en-IN')}/year)`);
+          score += 20;
+        } else {
+          isDisqualified = true;
+        }
+      } else {
+        unverifiedRequirements.push(`Household annual income must be under ₹${scheme.income_limit_annual.toLocaleString('en-IN')}`);
+      }
+    }
+
+    if (isDisqualified) continue;
+
+    // 6. Disability Status Rule
+    if (scheme.category === 'Differently Abled') {
+      if (request.is_differently_abled) {
+        matchedRules.push('Valid UDID / Differently Abled Welfare criteria match');
+        score += 30;
+      } else if (request.is_differently_abled === false) {
+        continue;
+      } else {
+        unverifiedRequirements.push('Requires UDID / disability assessment certificate (40%+ benchmark disability)');
+      }
+    }
+
+    // Determine Match Level
+    let matchLevel: 'high' | 'possible' | 'more_info_needed' = 'more_info_needed';
+    if (score >= 50 && unverifiedRequirements.length === 0) {
+      matchLevel = 'high';
+    } else if (score >= 25 || matchedRules.length > 0) {
+      matchLevel = 'possible';
+    }
+
+    const explanation = `Matches ${matchedRules.length} core criteria (${matchedRules.slice(0, 2).join('; ')}). ${
+      unverifiedRequirements.length > 0 ? `Needs verification: ${unverifiedRequirements.join(', ')}.` : 'Strong alignment with official guidelines.'
+    }`;
+
+    results.push({
+      scheme_id: scheme.slug,
+      scheme_name: scheme.name,
+      category: scheme.category,
+      benefit: scheme.benefit,
+      match_level: matchLevel,
+      matched_rules: matchedRules,
+      unverified_requirements: unverifiedRequirements,
+      explanation,
+      official_url: scheme.official_source
+    });
+  }
+
+  // Sort by High match first, then Possible, then More info
+  const rank = { high: 3, possible: 2, more_info_needed: 1 };
+  results.sort((a, b) => rank[b.match_level] - rank[a.match_level]);
+
+  return results;
+}
+
+// -------------------------------------------------------------
+// OFFICIAL SOURCES & TRUST VERIFICATION
+// -------------------------------------------------------------
+
+export async function getOfficialSources(): Promise<SourceRecord[]> {
+  const database = await getDatabase();
+  const stmt = database.prepare(`SELECT * FROM sources ORDER BY verification_status DESC, title ASC`);
+  const sources: SourceRecord[] = [];
+
+  while (stmt.step()) {
+    const row = stmt.get();
+    const cols = stmt.getColumnNames();
+    const obj: any = {};
+    cols.forEach((col, idx) => {
+      obj[col] = row[idx];
+    });
+    sources.push(obj as SourceRecord);
+  }
+  stmt.free();
+  return sources;
+}
+
+// -------------------------------------------------------------
+// CHECKLIST PERSISTENCE (BACKEND DATABASE)
+// -------------------------------------------------------------
+
+export async function getChecklists(): Promise<ChecklistRecord[]> {
+  const database = await getDatabase();
+  const stmt = database.prepare(`SELECT * FROM checklists ORDER BY updated_at DESC`);
+  const checklists: ChecklistRecord[] = [];
+
+  while (stmt.step()) {
+    const row = stmt.get();
+    const cols = stmt.getColumnNames();
+    const obj: any = {};
+    cols.forEach((col, idx) => {
+      obj[col] = row[idx];
+    });
+
+    // Fetch items for this checklist
+    const itemStmt = database.prepare(`SELECT * FROM checklist_items WHERE checklist_id = ? ORDER BY required DESC, id ASC`);
+    itemStmt.bind([obj.id]);
+    const items: ChecklistItemRecord[] = [];
+    while (itemStmt.step()) {
+      const iRow = itemStmt.get();
+      const iCols = itemStmt.getColumnNames();
+      const iObj: any = {};
+      iCols.forEach((c, i) => {
+        iObj[c] = iRow[i];
+      });
+      items.push({
+        id: iObj.id,
+        checklist_id: iObj.checklist_id,
+        title: iObj.title,
+        description: iObj.description,
+        required: Boolean(iObj.required),
+        completed: Boolean(iObj.completed),
+        source: iObj.source
+      });
+    }
+    itemStmt.free();
+
+    checklists.push({
+      id: obj.id,
+      title: obj.title,
+      target_slug: obj.target_slug,
+      target_type: obj.target_type,
+      items,
+      created_at: obj.created_at,
+      updated_at: obj.updated_at
+    });
+  }
+  stmt.free();
+  return checklists;
+}
+
+export async function getChecklistById(id: string): Promise<ChecklistRecord | null> {
+  const database = await getDatabase();
+  const stmt = database.prepare(`SELECT * FROM checklists WHERE id = ?`);
+  stmt.bind([id]);
+
+  if (!stmt.step()) {
+    stmt.free();
+    return null;
+  }
+
+  const row = stmt.get();
+  const cols = stmt.getColumnNames();
+  const obj: any = {};
+  cols.forEach((col, idx) => {
+    obj[col] = row[idx];
+  });
+  stmt.free();
+
+  const itemStmt = database.prepare(`SELECT * FROM checklist_items WHERE checklist_id = ? ORDER BY required DESC, id ASC`);
+  itemStmt.bind([id]);
+  const items: ChecklistItemRecord[] = [];
+  while (itemStmt.step()) {
+    const iRow = itemStmt.get();
+    const iCols = itemStmt.getColumnNames();
+    const iObj: any = {};
+    iCols.forEach((c, i) => {
+      iObj[c] = iRow[i];
+    });
+    items.push({
+      id: iObj.id,
+      checklist_id: iObj.checklist_id,
+      title: iObj.title,
+      description: iObj.description,
+      required: Boolean(iObj.required),
+      completed: Boolean(iObj.completed),
+      source: iObj.source
+    });
+  }
+  itemStmt.free();
+
+  return {
+    id: obj.id,
+    title: obj.title,
+    target_slug: obj.target_slug,
+    target_type: obj.target_type,
+    items,
+    created_at: obj.created_at,
+    updated_at: obj.updated_at
+  };
+}
+
+export async function createChecklist(data: {
+  title: string;
+  target_slug?: string;
+  target_type?: 'service' | 'scheme';
+  items?: { title: string; description?: string; required?: boolean; source?: string }[];
+}): Promise<ChecklistRecord> {
+  const database = await getDatabase();
+  const id = `chk-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+  const now = new Date().toISOString();
+
+  database.run(
+    `INSERT INTO checklists (id, title, target_slug, target_type, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+    [id, data.title, data.target_slug || null, data.target_type || null, now, now]
+  );
+
+  const createdItems: ChecklistItemRecord[] = [];
+  if (data.items && Array.isArray(data.items)) {
+    for (const item of data.items) {
+      const itemId = `item-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+      database.run(
+        `INSERT INTO checklist_items (id, checklist_id, title, description, required, completed, source)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        [itemId, id, item.title, item.description || null, item.required ? 1 : 0, 0, item.source || null]
+      );
+      createdItems.push({
+        id: itemId,
+        checklist_id: id,
+        title: item.title,
+        description: item.description,
+        required: item.required ?? true,
+        completed: false,
+        source: item.source
+      });
+    }
+  }
+
+  return {
+    id,
+    title: data.title,
+    target_slug: data.target_slug,
+    target_type: data.target_type,
+    items: createdItems,
+    created_at: now,
+    updated_at: now
+  };
+}
+
+export async function updateChecklistItem(checklistId: string, itemId: string, completed: boolean): Promise<boolean> {
+  const database = await getDatabase();
+  database.run(
+    `UPDATE checklist_items SET completed = ? WHERE id = ? AND checklist_id = ?`,
+    [completed ? 1 : 0, itemId, checklistId]
+  );
+  database.run(
+    `UPDATE checklists SET updated_at = ? WHERE id = ?`,
+    [new Date().toISOString(), checklistId]
+  );
+  return true;
+}
+
+export async function deleteChecklist(id: string): Promise<boolean> {
+  const database = await getDatabase();
+  database.run(`DELETE FROM checklist_items WHERE checklist_id = ?`, [id]);
+  database.run(`DELETE FROM checklists WHERE id = ?`, [id]);
+  return true;
+}
+
+// -------------------------------------------------------------
+// ADMIN MANAGEMENT OPERATIONS (PROTECTED)
+// -------------------------------------------------------------
+
+export async function adminUpdateVerification(id: string, status: TrustStatus, notes?: string): Promise<boolean> {
+  const database = await getDatabase();
+  const now = new Date().toISOString().split('T')[0];
+  database.run(
+    `UPDATE sources SET verification_status = ?, last_verified = ? WHERE id = ?`,
+    [status, now, id]
+  );
+  database.run(
+    `UPDATE schemes SET status = ?, last_verified = ? WHERE slug = (SELECT associated_slug FROM sources WHERE id = ?)`,
+    [status, now, id]
+  );
+  return true;
+}
+
+export async function adminUpdateScheme(id: number, data: Partial<GovernmentScheme>): Promise<boolean> {
+  const database = await getDatabase();
+  const now = new Date().toISOString().split('T')[0];
+
+  const updates: string[] = [];
+  const params: any[] = [];
+
+  if (data.name) { updates.push('name = ?'); params.push(data.name); }
+  if (data.benefit) { updates.push('benefit = ?'); params.push(data.benefit); }
+  if (data.who_can_apply) { updates.push('who_can_apply = ?'); params.push(data.who_can_apply); }
+  if (data.what_you_get) { updates.push('what_you_get = ?'); params.push(data.what_you_get); }
+  if (data.official_source) { updates.push('official_source = ?'); params.push(data.official_source); }
+  if (data.status) { updates.push('status = ?'); params.push(data.status); }
+  if (data.department) { updates.push('department = ?'); params.push(data.department); }
+  if (data.important_notes) { updates.push('important_notes = ?'); params.push(data.important_notes); }
+
+  updates.push('last_verified = ?');
+  params.push(now);
+
+  params.push(id);
+  database.run(`UPDATE schemes SET ${updates.join(', ')} WHERE id = ?`, params);
+  return true;
+}
+
