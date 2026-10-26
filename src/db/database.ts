@@ -814,6 +814,52 @@ function seedInitialData(database: Database) {
       max_age: 45,
       gender: 'All'
     },
+    {
+      name: 'Unemployed Youth Employment Generation Programme (UYEGP)',
+      slug: 'uyegp-self-employment',
+      category: 'Employment & Skills',
+      department: 'Department of Micro, Small and Medium Enterprises (MSME), Government of Tamil Nadu',
+      state_or_central: 'Tamil Nadu State Government',
+      benefit: 'Up to 25% Government Subsidy (Max ₹3.75 Lakhs for Manufacturing & ₹1.25 Lakhs for Service/Trading) + Subsidized Bank Financing',
+      who_can_apply: 'Unemployed youth in Tamil Nadu aged 18 to 35 (up to 45 for Special Categories) with Class 8 pass and family annual income up to ₹5 Lakhs seeking self-employment.',
+      what_you_get: 'Bank loan financing for establishing new micro-enterprises (Manufacturing up to ₹15 Lakhs, Service & Business/Trading up to ₹5 Lakhs) with 25% Government Capital Subsidy, low promoter equity contribution (5%-10%), and 7-day EDP skill training.',
+      eligibility: [
+        'Permanent resident of Tamil Nadu for a minimum of 3 continuous years',
+        'Age limit: 18 to 35 years for General Category; 18 to 45 years for Special Categories (BC, MBC, SC, ST, Women, Differently Abled, Ex-Servicemen, Transgender)',
+        'Educational qualification: Minimum Class 8 Pass (Passed 8th Standard)',
+        'Annual family income ceiling: Must not exceed ₹5,00,000 (₹5 Lakhs per annum)',
+        'Mandatory Entrepreneurship Development Programme (EDP) training for 7 days conducted by EDII / DIC upon selection',
+        'Promoter equity contribution: 10% of project cost for General Category; 5% for Special Categories',
+        'Exclusions: Existing business owners and previous beneficiaries of government capital subsidy schemes (e.g. PMEGP, NEEDS) are ineligible.'
+      ],
+      documents: [
+        'Aadhaar Card',
+        'Proof of TN Residence / Smart Family Ration Card (minimum 3 years residence in TN)',
+        'Educational Qualification Proof (8th Standard Pass Marksheet / Transfer Certificate / SSLC)',
+        'Community Certificate (for Special Category 5% promoter equity contribution)',
+        'Detailed Project Profile / Business Estimate Report with Machinery & Equipment Price Quotations',
+        'Active Bank Account Savings Passbook',
+        'Passport-size Photograph (2 copies)'
+      ],
+      steps: [
+        { step_number: 1, title: 'Online Application Submission on MSME Portal', description: 'Apply online at msmeonline.tn.gov.in/uyegp/ with personal details, educational proofs, and project profile.', location_type: 'Online' },
+        { step_number: 2, title: 'District Industries Centre (DIC) Task Force Interview', description: 'Appear for Task Force Committee interview at local DIC for project feasibility assessment.', location_type: 'Visit Center' },
+        { step_number: 3, title: 'Bank Loan Sanction & 7-Day EDP Training', description: 'Recommended bank sanctions 85%-90% project loan; applicant undergoes mandatory 7-day Entrepreneurship Development Programme.', location_type: 'Hybrid' },
+        { step_number: 4, title: 'Promoter Contribution Deposit & Subsidy Disbursement', description: 'Deposit applicant equity (5% or 10%) into bank account; DIC releases 25% government subsidy directly to bank.', location_type: 'Hybrid' }
+      ],
+      status: 'VERIFIED',
+      official_source: 'https://msmeonline.tn.gov.in/uyegp/',
+      source_verified_authority: 'Department of Micro, Small and Medium Enterprises (MSME), Government of Tamil Nadu',
+      last_verified: '2026-10-26',
+      effective_date: '2010-07-15',
+      important_notes: 'Project cost ceiling: Manufacturing up to ₹15 Lakhs; Service & Trading up to ₹5 Lakhs. 25% Government Subsidy capped at ₹3.75 Lakhs for Manufacturing and ₹1.25 Lakhs for Service/Trading. Final loan sanction and disbursement depend on bank feasibility appraisal.',
+      target_demographics: ['unemployed youth', 'job seeker', 'youth', 'entrepreneur', 'self-employment', 'small business', 'business loan', 'unemployed'],
+      education_level: ['School', 'College', 'ITI / Polytechnic', 'Graduate', 'Other / None'],
+      min_age: 18,
+      max_age: 45,
+      income_limit_annual: 500000,
+      gender: 'All'
+    },
 
     // 4. Differently Abled
     {
@@ -1035,7 +1081,7 @@ function seedInitialData(database: Database) {
 
   for (const s of schemesData) {
     database.run(
-      `INSERT INTO schemes (
+      `INSERT OR IGNORE INTO schemes (
         name, slug, category, department, state_or_central, benefit, who_can_apply, what_you_get,
         eligibility, documents, application_steps, status, official_source,
         source_verified_authority, last_verified, effective_date, important_notes,
@@ -1086,12 +1132,13 @@ function seedInitialData(database: Database) {
     { id: 'src-pmkisan', url: 'https://pmkisan.gov.in', domain: 'pmkisan.gov.in', title: 'PM-KISAN Samman Nidhi Portal', government_department: 'Ministry of Agriculture and Farmers Welfare, GoI', source_type: 'National Welfare Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'pm-kisan-income-support' },
     { id: 'src-oap', url: 'https://nsap.nic.in', domain: 'nsap.nic.in', title: 'National Social Assistance Programme (NSAP)', government_department: 'Ministry of Rural Development & Social Welfare TN', source_type: 'National Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'old-age-pension-scheme' },
     { id: 'src-housing', url: 'https://pmayg.nic.in', domain: 'pmayg.nic.in', title: 'Pradhan Mantri Awas Yojana - Gramin', government_department: 'Ministry of Rural Development & RDPR TN', source_type: 'National Housing Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'pm-awas-yojana-housing' },
-    { id: 'src-disability', url: 'https://swims.tn.gov.in', domain: 'swims.tn.gov.in', title: 'Differently Abled Welfare Board', government_department: 'Welfare of Differently Abled Persons Department, TN', source_type: 'State Welfare Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'differently-abled-maintenance-allowance' }
+    { id: 'src-disability', url: 'https://swims.tn.gov.in', domain: 'swims.tn.gov.in', title: 'Differently Abled Welfare Board', government_department: 'Welfare of Differently Abled Persons Department, TN', source_type: 'State Welfare Portal', verification_status: 'VERIFIED', last_verified: '2026-08-14', associated_slug: 'differently-abled-maintenance-allowance' },
+    { id: 'src-uyegp', url: 'https://msmeonline.tn.gov.in/uyegp/', domain: 'msmeonline.tn.gov.in', title: 'UYEGP MSME Portal', government_department: 'Department of Micro, Small and Medium Enterprises (MSME), Government of Tamil Nadu', source_type: 'State MSME Portal', verification_status: 'VERIFIED', last_verified: '2026-10-26', associated_slug: 'uyegp-self-employment' }
   ];
 
   for (const src of sourcesData) {
     database.run(
-      `INSERT INTO sources (id, url, domain, title, government_department, source_type, verification_status, last_verified, associated_slug)
+      `INSERT OR IGNORE INTO sources (id, url, domain, title, government_department, source_type, verification_status, last_verified, associated_slug)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [src.id, src.url, src.domain, src.title, src.government_department, src.source_type, src.verification_status, src.last_verified, src.associated_slug]
     );

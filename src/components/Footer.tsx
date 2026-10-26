@@ -125,6 +125,14 @@ export const Footer: React.FC<FooterProps> = ({ onSelectService, onSelectScheme,
                   Naan Mudhalvan Skill Scheme
                 </button>
               </li>
+              <li>
+                <button
+                  onClick={() => onSelectScheme?.('uyegp-self-employment')}
+                  className="hover:text-white hover:underline transition-colors text-left"
+                >
+                  UYEGP (Self-Employment Loan)
+                </button>
+              </li>
             </ul>
           </div>
 
@@ -139,7 +147,8 @@ export const Footer: React.FC<FooterProps> = ({ onSelectService, onSelectScheme,
                 <a href="https://uidai.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">uidai.gov.in</a> •
                 <a href="https://incometax.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">incometax.gov.in</a> •
                 <a href="https://parivahan.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">parivahan.gov.in</a> •
-                <a href="https://voters.eci.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">voters.eci.gov.in</a>
+                <a href="https://voters.eci.gov.in" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">voters.eci.gov.in</a> •
+                <a href="https://msmeonline.tn.gov.in/uyegp/" target="_blank" rel="noopener noreferrer" className="hover:text-white underline">msmeonline.tn.gov.in/uyegp/</a>
               </div>
             </div>
 

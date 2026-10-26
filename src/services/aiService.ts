@@ -53,6 +53,8 @@ export async function processChatQuery(message: string, requestedServiceSlug?: s
       matchedScheme = await getSchemeBySlug('pm-kisan-income-support');
     } else if (queryLower.includes('old age') || queryLower.includes('oap') || queryLower.includes('pension')) {
       matchedScheme = await getSchemeBySlug('old-age-pension-scheme');
+    } else if (queryLower.includes('uyegp') || queryLower.includes('self employment') || queryLower.includes('self-employment') || queryLower.includes('unemployed youth') || queryLower.includes('msme loan') || queryLower.includes('business loan tn')) {
+      matchedScheme = await getSchemeBySlug('uyegp-self-employment');
     }
   }
 
@@ -190,7 +192,7 @@ Please provide a helpful, easy-to-understand response using the verified informa
       defaultSuggested = [
         "What documents do I need for a fresh passport?",
         "Who is eligible for Pudhumai Penn ₹1,000 scheme?",
-        "How to apply for Kalaignar Magalir Urimai Thittam?",
+        "How do I apply for UYEGP self-employment loan in Tamil Nadu?",
         "What are the guidelines for Tamil Pudhalvan scheme?"
       ];
     }
