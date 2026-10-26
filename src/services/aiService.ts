@@ -163,7 +163,7 @@ Please provide a helpful, easy-to-understand response using the verified informa
   try {
     const ai = getAiClient();
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-3.8-flash',
       contents: prompt,
       config: {
         systemInstruction,
