@@ -141,6 +141,7 @@ export const SchemesPage: React.FC<SchemesPageProps> = ({
               key={scheme.id}
               scheme={scheme}
               onSelect={onSelectScheme}
+              onViewGuide={onSelectScheme}
               onOpenChecklist={onOpenChecklist}
             />
           ))}

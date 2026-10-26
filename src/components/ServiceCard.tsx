@@ -5,13 +5,45 @@ import { ArrowRight, Clock, Tag, ExternalLink, Sparkles } from 'lucide-react';
 
 interface ServiceCardProps {
   service: GovernmentService;
-  onViewGuide: (slug: string) => void;
+  onViewGuide?: (slug: string) => void;
+  onSelect?: (slug: string) => void;
   onAskAI?: (serviceName: string) => void;
 }
 
-export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onViewGuide, onAskAI }) => {
+export const ServiceCard: React.FC<ServiceCardProps> = ({
+  service,
+  onViewGuide,
+  onSelect,
+  onAskAI
+}) => {
+  const handleViewGuide = (e?: React.MouseEvent) => {
+    if (e) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    if (typeof onViewGuide === 'function') {
+      onViewGuide(service.slug);
+    } else if (typeof onSelect === 'function') {
+      onSelect(service.slug);
+    } else {
+      console.warn(`[ServiceCard] No navigation callback provided for service "${service.slug}"`);
+    }
+  };
+
+  const handleAskAI = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    if (typeof onAskAI === 'function') {
+      onAskAI(service.name);
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between group">
+    <div
+      id={`service-card-${service.slug}`}
+      className="bg-white rounded-2xl border border-slate-200/80 p-6 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all flex flex-col justify-between group cursor-pointer"
+      onClick={handleViewGuide}
+    >
       <div>
         {/* Top bar with Icon and Category */}
         <div className="flex items-center justify-between mb-4">
@@ -24,7 +56,10 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onViewGuide, 
         </div>
 
         {/* Title */}
-        <h3 className="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors">
+        <h3
+          onClick={handleViewGuide}
+          className="text-lg font-bold text-slate-900 mb-2 group-hover:text-indigo-600 transition-colors"
+        >
           {service.name}
         </h3>
 
@@ -50,7 +85,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onViewGuide, 
       <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2">
         {onAskAI && (
           <button
-            onClick={() => onAskAI(service.name)}
+            type="button"
+            id={`service-ask-ai-${service.slug}`}
+            onClick={handleAskAI}
             className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 py-1.5 px-2 rounded-lg hover:bg-indigo-50 transition-colors"
             title={`Ask AI about ${service.name}`}
           >
@@ -60,7 +97,9 @@ export const ServiceCard: React.FC<ServiceCardProps> = ({ service, onViewGuide, 
         )}
 
         <button
-          onClick={() => onViewGuide(service.slug)}
+          type="button"
+          id={`service-view-guide-${service.slug}`}
+          onClick={handleViewGuide}
           className="w-full flex items-center justify-center gap-2 bg-slate-900 text-white text-xs font-bold py-2.5 px-4 rounded-xl group-hover:bg-indigo-600 transition-colors shadow-sm"
         >
           <span>View Complete Guide</span>

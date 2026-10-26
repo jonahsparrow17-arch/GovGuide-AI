@@ -78,6 +78,7 @@ export const ServicesPage: React.FC<ServicesPageProps> = ({
             key={service.id}
             service={service}
             onViewGuide={onSelectService}
+            onSelect={onSelectService}
             onAskAI={(name) => onOpenAIQuery(`What are the steps and documents for ${name}?`)}
           />
         ))}

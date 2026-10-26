@@ -168,7 +168,9 @@ export const HomePage: React.FC<HomePageProps> = ({
             <ServiceCard
               key={service.id}
               service={service}
+              onViewGuide={onSelectService}
               onSelect={onSelectService}
+              onAskAI={(name) => onOpenAIQuery(`What are the steps and documents for ${name}?`)}
             />
           ))}
         </div>
@@ -270,6 +272,7 @@ export const HomePage: React.FC<HomePageProps> = ({
                 key={scheme.id}
                 scheme={scheme}
                 onSelect={onSelectScheme}
+                onViewGuide={onSelectScheme}
               />
             ))}
           </div>

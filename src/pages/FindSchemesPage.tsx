@@ -21,13 +21,15 @@ import {
 } from 'lucide-react';
 
 interface FindSchemesPageProps {
-  onSelectScheme: (slug: string) => void;
-  onOpenChecklist: (slug: string) => void;
-  onAskAI: (query: string) => void;
+  onSelectScheme?: (slug: string) => void;
+  onViewGuide?: (slug: string) => void;
+  onOpenChecklist?: (slug: string) => void;
+  onAskAI?: (query: string) => void;
 }
 
 export const FindSchemesPage: React.FC<FindSchemesPageProps> = ({
   onSelectScheme,
+  onViewGuide,
   onOpenChecklist,
   onAskAI
 }) => {
@@ -43,6 +45,22 @@ export const FindSchemesPage: React.FC<FindSchemesPageProps> = ({
   const [loading, setLoading] = useState<boolean>(false);
   const [results, setResults] = useState<SchemeMatchResult[]>([]);
   const [searched, setSearched] = useState<boolean>(false);
+
+  const handleSelectScheme = (slug: string) => {
+    if (typeof onSelectScheme === 'function') {
+      onSelectScheme(slug);
+    } else if (typeof onViewGuide === 'function') {
+      onViewGuide(slug);
+    }
+  };
+
+  const handleOpenChecklist = (slug: string) => {
+    if (typeof onOpenChecklist === 'function') {
+      onOpenChecklist(slug);
+    } else {
+      handleSelectScheme(slug);
+    }
+  };
 
   const USER_TYPES = [
     { id: 'Student', label: 'Student', icon: GraduationCap, desc: 'School, College, or ITI/Polytechnic student' },
@@ -416,7 +434,7 @@ export const FindSchemesPage: React.FC<FindSchemesPageProps> = ({
 
                     <div>
                       <h3
-                        onClick={() => onSelectScheme(scheme.slug)}
+                        onClick={() => handleSelectScheme(scheme.slug)}
                         className="text-lg font-extrabold text-slate-900 hover:text-blue-900 cursor-pointer transition-colors"
                       >
                         {scheme.name}
@@ -454,14 +472,16 @@ export const FindSchemesPage: React.FC<FindSchemesPageProps> = ({
                       </span>
                       <div className="flex items-center gap-2">
                         <button
-                          onClick={() => onOpenChecklist(scheme.slug)}
+                          type="button"
+                          onClick={() => handleOpenChecklist(scheme.slug)}
                           className="text-xs font-semibold text-slate-700 bg-slate-100 hover:bg-slate-200 px-3 py-2 rounded-xl transition-colors"
                         >
                           Checklist
                         </button>
                         <button
+                          type="button"
                           id={`view-guide-btn-${scheme.slug}`}
-                          onClick={() => onSelectScheme(scheme.slug)}
+                          onClick={() => handleSelectScheme(scheme.slug)}
                           className="inline-flex items-center gap-1 text-xs font-bold text-white bg-blue-900 hover:bg-blue-950 px-4 py-2 rounded-xl transition-colors shadow-xs"
                         >
                           <span>View Full Guide</span>

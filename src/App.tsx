@@ -139,6 +139,8 @@ export default function App() {
               initialMessage={initialAiQuery}
               availableServices={services}
               onSelectService={handleSelectService}
+              onSelectScheme={handleSelectScheme}
+              onViewGuide={handleSelectService}
             />
           )}
         </main>

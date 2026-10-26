@@ -8,6 +8,8 @@ interface AIChatPageProps {
   initialMessage?: string;
   availableServices?: GovernmentService[];
   onSelectService?: (slug: string) => void;
+  onSelectScheme?: (slug: string) => void;
+  onViewGuide?: (slug: string) => void;
 }
 
 interface MessageItem {
@@ -15,6 +17,7 @@ interface MessageItem {
   sender: 'user' | 'ai';
   text: string;
   service?: string;
+  serviceSlug?: string;
   source?: string;
   suggestedQuestions?: string[];
   timestamp: Date;
@@ -24,7 +27,9 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
   initialServiceSlug,
   initialMessage,
   availableServices = [],
-  onSelectService
+  onSelectService,
+  onSelectScheme,
+  onViewGuide
 }) => {
   const [schemes, setSchemes] = useState<GovernmentScheme[]>([]);
   const [messages, setMessages] = useState<MessageItem[]>([
@@ -42,6 +47,24 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
       timestamp: new Date()
     }
   ]);
+
+  const handleNavigateGuide = (slug: string) => {
+    // Check if it's a service or scheme
+    const isService = availableServices.some(s => s.slug === slug);
+    if (isService) {
+      if (typeof onSelectService === 'function') {
+        onSelectService(slug);
+      } else if (typeof onViewGuide === 'function') {
+        onViewGuide(slug);
+      }
+    } else {
+      if (typeof onSelectScheme === 'function') {
+        onSelectScheme(slug);
+      } else if (typeof onViewGuide === 'function') {
+        onViewGuide(slug);
+      }
+    }
+  };
 
   const [inputMessage, setInputMessage] = useState('');
   const [selectedServiceSlug, setSelectedServiceSlug] = useState<string>(initialServiceSlug || '');
@@ -99,11 +122,15 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
         serviceSlug: selectedServiceSlug || undefined
       });
 
+      const matchingService = availableServices.find(s => s.name.toLowerCase() === (response.service || '').toLowerCase()) ||
+        schemes.find(sch => sch.name.toLowerCase() === (response.service || '').toLowerCase());
+
       const aiMsg: MessageItem = {
         id: 'ai-' + Date.now(),
         sender: 'ai',
         text: response.answer,
         service: response.service,
+        serviceSlug: matchingService ? matchingService.slug : (selectedServiceSlug || undefined),
         source: response.source,
         suggestedQuestions: response.suggestedQuestions,
         timestamp: new Date()
@@ -272,17 +299,30 @@ export const AIChatPage: React.FC<AIChatPageProps> = ({
                 {/* Source attribution and actions for AI */}
                 {msg.sender === 'ai' && (
                   <div className="mt-4 pt-3 border-t border-slate-200/60 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
-                    {msg.source && (
-                      <a
-                        href={msg.source}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 hover:text-blue-950"
-                      >
-                        <ExternalLink className="w-3 h-3" />
-                        <span>Official Source Portal</span>
-                      </a>
-                    )}
+                    <div className="flex items-center gap-3 flex-wrap">
+                      {msg.source && (
+                        <a
+                          href={msg.source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-blue-800 hover:text-blue-950"
+                        >
+                          <ExternalLink className="w-3 h-3" />
+                          <span>Official Source Portal</span>
+                        </a>
+                      )}
+
+                      {msg.serviceSlug && (
+                        <button
+                          type="button"
+                          onClick={() => handleNavigateGuide(msg.serviceSlug!)}
+                          className="inline-flex items-center gap-1 text-[11px] font-bold text-indigo-700 hover:text-indigo-900 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 transition-colors"
+                        >
+                          <BookOpen className="w-3 h-3" />
+                          <span>View Complete Guide</span>
+                        </button>
+                      )}
+                    </div>
 
                     <button
                       onClick={() => handleCopy(msg.id, msg.text)}
